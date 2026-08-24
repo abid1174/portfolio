@@ -1,0 +1,95 @@
+---
+title: "RAG vs Fine-tuning"
+description: "Two different mechanisms for adapting an LLM to your domain, what each one actually changes inside the system, and how to pick between them."
+type: "ai"
+category: "RAG"
+tags: ["RAG", "Fine-tuning", "LLM", "Architecture"]
+difficulty: "intermediate"
+readingTime: 11
+publishedAt: "2026-06-29"
+updatedAt: "2026-07-13"
+featured: false
+related: ["ai/rag", "ai/embeddings", "ai/llm-evaluation"]
+---
+
+Teams reach for fine-tuning when what they actually need is RAG, and vice versa, more often than the tradeoff would suggest. The two solve different problems — one changes what the model knows how to do, the other changes what facts it has access to — and conflating them leads to expensive, slow-to-iterate systems that still don't answer factual questions correctly.
+
+## Two Different Ways to Add Knowledge
+
+Fine-tuning updates the model's weights on a labeled dataset, changing its behavior permanently until the next fine-tuning run. RAG leaves the weights untouched and instead changes what's in the prompt at request time, retrieving relevant context from an external store before generation. Both are ways of getting a model to behave differently from its base training, but they operate on completely different parts of the system.
+
+<Callout type="note">
+The single most common mistake is fine-tuning a model to "know" facts that change frequently — pricing, inventory, policy text — when those facts belong in a retrieval index that can be updated in seconds, not in a training dataset that requires a new run every time something changes.
+</Callout>
+
+## What Fine-Tuning Actually Changes
+
+Fine-tuning is good at teaching a model a consistent style, a specific output format, a domain vocabulary, or a narrow behavioral pattern — things that are hard to fully specify in a prompt but easy to demonstrate with a few hundred or thousand examples. It does not reliably teach the model new facts in a way that generalizes; a model fine-tuned on a set of question-answer pairs tends to memorize surface patterns from those specific examples rather than building a queryable internal fact store you can trust for arbitrary new questions.
+
+```python
+# Illustrative shape of a fine-tuning dataset — teaching format and tone,
+# not injecting facts that change over time.
+examples = [
+    {
+        "input": "Summarize this incident report for an exec audience.",
+        "output": "Impact: 12 min partial outage, EU region. Root cause: ...",
+    },
+    {
+        "input": "Summarize this incident report for an on-call handoff.",
+        "output": "Timeline: 14:02 alert fired. 14:04 mitigation started. ...",
+    },
+]
+```
+
+Fine-tuning also has a data-volume floor: a handful of examples is rarely enough to shift behavior reliably without also overfitting to the exact phrasing of those examples. Getting fine-tuning to actually generalize typically means investing in a dataset large and diverse enough to cover the range of inputs the model will see in production — which is itself a meaningful engineering effort, separate from the training run.
+
+## What RAG Actually Changes
+
+RAG changes what the model sees, not what it knows how to do. It's strong exactly where fine-tuning is weak: fresh, frequently changing, or user-specific facts. Update the underlying document store and the next request reflects the change immediately, with no retraining cycle and no risk of the model overwriting a previously learned fact incorrectly.
+
+| Requirement | Better fit |
+|---|---|
+| Facts change daily or per-user | RAG |
+| Consistent output format or house style | Fine-tuning |
+| Need to cite or show sources | RAG |
+| Domain-specific reasoning pattern (e.g. legal clause analysis style) | Fine-tuning |
+| New data arrives faster than a training cycle | RAG |
+| Latency budget can't absorb a retrieval hop | Fine-tuning (or a distilled small model) |
+
+## Cost and Iteration Speed
+
+<Tradeoff
+  optionA="RAG"
+  optionB="Fine-tuning"
+  a={["Knowledge updates instantly by editing the index", "Costs extra tokens and a retrieval hop on every single call"]}
+  b={["Lower per-call cost once trained — no extra context to send", "Every knowledge update requires a new training run and evaluation pass"]}
+  recommendation="Reach for RAG first for anything knowledge-shaped; fine-tune for format, tone, and behavioral consistency, not for facts."
+/>
+
+Fine-tuning also carries a cost RAG doesn't: catastrophic forgetting risk. Training on a narrow dataset can degrade performance on tasks outside that dataset's distribution if the run isn't carefully scoped and evaluated against a broader regression suite, not just the fine-tuning task itself.
+
+## When Fine-Tuning Wins
+
+There are real cases where fine-tuning is the right call even though RAG is the default: when the desired behavior is a stable transformation (translate to a specific house style, always structure output a certain way) rather than a lookup, when latency budgets can't tolerate a retrieval hop, or when you're distilling a smaller, cheaper model to imitate a larger one's behavior on a narrow, well-defined task. None of those are "the model needs to know X fact" — they're all "the model needs to behave a certain way," which is what fine-tuning is actually good at.
+
+<Callout type="insight" title="Model choice interacts with this decision">
+A smaller model that's cheap enough to run at high volume is often only viable after fine-tuning it on your specific task — a frontier model can succeed at that task zero-shot, but a small model may need the extra signal from fine-tuning to match it. That's a legitimate reason to fine-tune even for a "capability" problem rather than a "knowledge" one.
+</Callout>
+
+<ModelComparison
+  models={[
+    { name: "claude-opus-5", context: "1M", strengths: "Strong zero-shot performance on novel domains without fine-tuning", tradeoff: "Higher cost per call makes fine-tuning a smaller model more attractive at volume" },
+    { name: "claude-sonnet-5", context: "1M", strengths: "Good balance for RAG pipelines — handles long retrieved context well", tradeoff: "Still benefits from fine-tuning for narrow, high-volume classification tasks" },
+    { name: "claude-haiku-4-5-20251001", context: "200K", strengths: "Cheapest to run at scale, good fine-tuning target for narrow tasks", tradeoff: "Needs either strong retrieval context or fine-tuning to match larger models on complex tasks" }
+  ]}
+/>
+
+## Combining Both
+
+In practice, mature systems often use both: RAG for the facts, and a lightly fine-tuned model — or a well-tuned prompt on a frontier model — for the format and tone of the final answer. Fine-tuning a model to more reliably cite only its retrieved context, for example, addresses a real weakness (drifting back to parametric knowledge) that pure prompting doesn't fully solve, without trying to make fine-tuning carry the factual load it's bad at carrying.
+
+The order of operations matters when combining them: stand up RAG first, evaluate where it falls short, and only then consider whether a targeted fine-tuning run addresses a specific, measured weakness — citation discipline, output format compliance, tone consistency. Fine-tuning against a problem you haven't actually measured tends to produce a model that's different, not necessarily better, and you'll have no eval baseline to confirm which one it is.
+
+## Takeaway
+
+Ask what's actually changing — the facts available to the model, or the behavior the model exhibits — before picking a mechanism. RAG is the default for knowledge that moves faster than a training cycle; fine-tuning earns its cost when the goal is a consistent, hard-to-prompt-for behavior rather than a fact lookup.

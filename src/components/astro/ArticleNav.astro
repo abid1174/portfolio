@@ -1,0 +1,135 @@
+---
+import { ArrowLeft, ArrowRight } from 'lucide-react';
+import type { ContentEntry } from '../../lib/content';
+import { pillars } from '../../data/topics';
+
+interface Props {
+  prev?: ContentEntry;
+  next?: ContentEntry;
+  /** Strongest match from another pillar, shown as a sidestep. */
+  cross?: ContentEntry;
+}
+
+const { prev, next, cross } = Astro.props;
+---
+
+{
+  (prev || next || cross) && (
+    <nav class="article-nav" aria-label="More articles">
+      <div class="nav-pair">
+        {prev ? (
+          <a class="nav-card is-prev" href={prev.url} rel="prev">
+            <span class="nav-label">
+              <ArrowLeft size={12} strokeWidth={2} aria-hidden="true" />
+              Previous
+            </span>
+            <span class="nav-title">{prev.title}</span>
+          </a>
+        ) : (
+          <span />
+        )}
+
+        {next && (
+          <a class="nav-card is-next" href={next.url} rel="next">
+            <span class="nav-label">
+              Next article
+              <ArrowRight size={12} strokeWidth={2} aria-hidden="true" />
+            </span>
+            <span class="nav-title">{next.title}</span>
+          </a>
+        )}
+      </div>
+
+      {cross && (
+        <a class={`nav-cross ${pillars[cross.pillar].accentClass}`} href={cross.url}>
+          <span class="nav-label">
+            Related {pillars[cross.pillar].label.toLowerCase()}
+            <ArrowRight size={12} strokeWidth={2} aria-hidden="true" />
+          </span>
+          <span class="nav-title">{cross.title}</span>
+        </a>
+      )}
+    </nav>
+  )
+}
+
+<style>
+  .article-nav {
+    display: grid;
+    gap: 0.6rem;
+    margin-top: 2.5rem;
+    padding-top: 2rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .nav-pair {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.6rem;
+  }
+
+  .nav-card,
+  .nav-cross {
+    display: grid;
+    gap: 0.35rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    text-decoration: none;
+    transition:
+      border-color var(--dur-base) var(--ease-out),
+      background-color var(--dur-base) var(--ease-out);
+  }
+
+  .nav-card:hover,
+  .nav-cross:hover {
+    border-color: color-mix(in oklab, var(--pillar) 40%, var(--border-default));
+    background: var(--surface-hover);
+  }
+
+  .is-next {
+    text-align: right;
+  }
+
+  .nav-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .is-next .nav-label {
+    justify-content: flex-end;
+  }
+
+  .nav-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--text-primary);
+  }
+
+  .nav-cross {
+    background: linear-gradient(to right, var(--pillar-wash), transparent 60%), var(--surface);
+  }
+  .nav-cross .nav-label {
+    color: var(--pillar);
+  }
+
+  @media (max-width: 40rem) {
+    .nav-pair {
+      grid-template-columns: 1fr;
+    }
+    .is-next {
+      text-align: left;
+    }
+    .is-next .nav-label {
+      justify-content: flex-start;
+    }
+  }
+</style>

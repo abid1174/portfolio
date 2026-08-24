@@ -1,0 +1,278 @@
+---
+import HeroVisual from './HeroVisual.astro';
+import StatGrid from './StatGrid.astro';
+import { ArrowRight, Command } from 'lucide-react';
+import { site } from '../../data/site';
+import type { ContentStats } from '../../lib/content';
+
+interface Props {
+  stats: ContentStats;
+}
+
+const { stats } = Astro.props;
+
+// Every figure is derived from the content collections — adding an
+// article updates the hero with no code change.
+const figures = [
+  { value: String(stats.concepts), label: 'Concepts', accent: 'var(--accent-blue)' },
+  {
+    value: String(stats.systemDesigns),
+    label: 'System Designs',
+    accent: 'var(--accent-purple)',
+  },
+  {
+    value: String(stats.practices),
+    label: 'Engineering Practices',
+    accent: 'var(--border-strong)',
+  },
+  { value: String(stats.ai), label: 'AI Notes', accent: 'var(--accent-cyan)' },
+];
+---
+
+<section class="hero" aria-labelledby="hero-title">
+  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="hero-grid grid-backdrop" aria-hidden="true"></div>
+
+  <div class="hero-inner">
+    <div class="hero-copy">
+      <p class="label-mono hero-eyebrow">
+        <span class="dot" aria-hidden="true"></span>
+        Engineering notes · {site.role}
+      </p>
+
+      <h1 id="hero-title">
+        <span class="line line-1">Clear concepts.</span>
+        <span class="line line-2">Scalable systems.</span>
+        <span class="line line-3">Smarter with AI.</span>
+      </h1>
+
+      <p class="hero-lede">
+        Notes on software concepts, system design practices, and AI — written from real
+        engineering experience, for engineers who want to understand how things work.
+      </p>
+
+      <div class="hero-actions">
+        <a class="btn btn-primary" href="/concepts">
+          Browse concepts
+          <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
+        </a>
+        <a class="btn btn-ghost" href="/system-design">Read a system design</a>
+        <p class="hero-hint">
+          <span>or press</span>
+          <kbd><Command size={10} strokeWidth={2.5} aria-hidden="true" />K</kbd>
+          <span>to search</span>
+        </p>
+      </div>
+    </div>
+
+    <div class="hero-visual">
+      <HeroVisual />
+    </div>
+  </div>
+
+  <div class="hero-stats">
+    <StatGrid stats={figures} />
+  </div>
+</section>
+
+<style>
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    background: linear-gradient(160deg, var(--surface) 0%, var(--bg-secondary) 55%);
+    padding: clamp(1.5rem, 4vw, 2.75rem);
+  }
+
+  .hero-glow {
+    position: absolute;
+    top: -45%;
+    left: 8%;
+    width: 70%;
+    height: 120%;
+    background:
+      radial-gradient(
+        40% 45% at 25% 40%,
+        color-mix(in oklab, var(--accent-blue) 26%, transparent),
+        transparent 70%
+      ),
+      radial-gradient(
+        35% 40% at 62% 30%,
+        color-mix(in oklab, var(--accent-purple) 20%, transparent),
+        transparent 70%
+      );
+    filter: blur(60px);
+    pointer-events: none;
+  }
+
+  .hero-grid {
+    position: absolute;
+    inset: 0;
+    opacity: 0.35;
+    /* Fades out toward the copy so text never fights the grid. */
+    mask-image: radial-gradient(80% 60% at 78% 30%, #000 0%, transparent 75%);
+    pointer-events: none;
+  }
+
+  .hero-inner {
+    position: relative;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
+    align-items: center;
+    gap: clamp(1.5rem, 4vw, 3rem);
+  }
+
+  .hero-eyebrow {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1.1rem;
+    color: var(--text-secondary);
+  }
+
+  .dot {
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--accent-cyan);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-cyan) 20%, transparent);
+  }
+
+  h1 {
+    margin: 0;
+    font-size: clamp(2.125rem, 5.4vw, 3.75rem);
+    font-weight: 700;
+    letter-spacing: -0.04em;
+    line-height: 1.04;
+  }
+
+  .line {
+    display: block;
+  }
+  .line-1 {
+    color: var(--text-primary);
+  }
+  .line-2 {
+    color: var(--text-primary);
+  }
+  /* Only the third line takes the gradient — restraint keeps it
+     reading as a publication, not a landing page. */
+  .line-3 {
+    background: linear-gradient(
+      100deg,
+      var(--accent-blue) 0%,
+      var(--accent-purple) 45%,
+      var(--accent-cyan) 100%
+    );
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+
+  .hero-lede {
+    margin: 1.25rem 0 0;
+    max-width: 46ch;
+    font-size: clamp(0.9375rem, 1.4vw, 1.0625rem);
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+
+  .hero-actions {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.65rem 0.9rem;
+    margin-top: 1.75rem;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.55rem 1rem;
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    font-weight: 500;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition:
+      background-color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      color var(--dur-fast) var(--ease-out);
+  }
+
+  .btn-primary {
+    background: var(--accent-blue);
+    color: #fff;
+  }
+  .btn-primary:hover {
+    background: var(--accent-blue-dim);
+  }
+  .btn-primary :global(svg) {
+    transition: transform var(--dur-base) var(--ease-out);
+  }
+  .btn-primary:hover :global(svg) {
+    transform: translateX(3px);
+  }
+
+  .btn-ghost {
+    border-color: var(--border-default);
+    color: var(--text-secondary);
+    background: var(--surface);
+  }
+  .btn-ghost:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .hero-hint {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    font-size: 0.75rem;
+    color: var(--text-muted);
+  }
+
+  kbd {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.1rem;
+    padding: 0.1rem 0.3rem;
+    border: 1px solid var(--border-default);
+    border-radius: 4px;
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+  }
+
+  .hero-stats {
+    position: relative;
+    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+  }
+
+  @media (max-width: 62rem) {
+    .hero-inner {
+      grid-template-columns: 1fr;
+    }
+    .hero-visual {
+      order: -1;
+      display: flex;
+      justify-content: center;
+    }
+    .hero-grid {
+      mask-image: radial-gradient(90% 40% at 50% 12%, #000 0%, transparent 78%);
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .hero-visual {
+      display: none;
+    }
+    .hero-hint {
+      display: none;
+    }
+  }
+</style>

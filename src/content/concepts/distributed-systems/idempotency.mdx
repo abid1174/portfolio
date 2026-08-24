@@ -1,0 +1,121 @@
+---
+title: "What is Idempotency?"
+description: "An idempotent operation produces the same result no matter how many times it's applied, which is the property that makes retrying a failed request safe in a distributed system."
+type: "concept"
+category: "Distributed Systems"
+tags: ["Distributed Systems", "API Design", "Reliability", "Concurrency"]
+difficulty: "intermediate"
+readingTime: 8
+publishedAt: "2026-07-10"
+updatedAt: "2026-07-10"
+featured: false
+related: ["concepts/outbox-pattern", "concepts/circuit-breaker", "system-design/rate-limiter"]
+---
+
+An operation is idempotent if performing it once has the same effect as performing it five times. That single property is what makes it safe to retry a request after a timeout, and in a distributed system, retries aren't an edge case — they're a constant, because you can never fully tell the difference between "the request failed" and "the response got lost."
+
+## Why This Matters: You Can't Trust a Timeout
+
+When a client sends a request and the connection drops before a response arrives, the client genuinely doesn't know what happened. The request might never have reached the server. It might have reached the server, been fully processed, and the response was lost on the way back. Both look identical from the client's side: a timeout.
+
+```
+Client                          Server
+  |-- POST /charge -------------->|
+  |                                | charge succeeds, response sent
+  |<---- (connection drops) ------X
+  |
+  | client sees a timeout, retries
+  |-- POST /charge -------------->|
+```
+
+If `POST /charge` isn't idempotent, that retry double-charges the customer. The retry itself isn't the bug — retrying is the correct response to an ambiguous failure. The bug is building an endpoint where retrying isn't safe.
+
+## Idempotent by Nature vs Idempotent by Design
+
+Some operations are idempotent for free. `Set balance to 500` gives the same result no matter how many times you run it. Others are inherently not: `Add 500 to balance` produces a different result every time it's applied, and no amount of careful coding changes that math — the operation itself has to change, or you need to layer deduplication on top of it.
+
+| HTTP method | Idempotent by spec | Why |
+|---|---|---|
+| `GET` | Yes | Read-only, no state change |
+| `PUT` | Yes | Replaces a resource with a given representation |
+| `DELETE` | Yes | Resource is gone whether you delete it once or five times |
+| `POST` | No | Typically creates a new resource each call |
+| `PATCH` | Not guaranteed | Depends entirely on what the patch expresses |
+
+<Callout type="note">
+"Idempotent by spec" describes intended semantics, not a guarantee your implementation honors them. A `PUT` handler that appends to a log instead of replacing a value is not actually idempotent no matter what the HTTP method suggests. The method is a contract with the caller, not something the framework enforces for you.
+</Callout>
+
+## Idempotency Keys
+
+`POST` requests — creating an order, charging a card, sending a message — are the common case that actually needs work. The standard fix is an idempotency key: the client generates a unique token per logical operation and sends it with the request. The server remembers which keys it has already processed and returns the original result for a repeat, instead of doing the work again.
+
+```http
+POST /charges HTTP/1.1
+Host: api.example.com
+Idempotency-Key: 8f14e45f-ceea-4b7e-8b1e-1b8b6f6f6a01
+Content-Type: application/json
+
+{ "amount": 4899, "currency": "usd", "customer": "cus_11" }
+```
+
+```ts
+async function handleCharge(req: Request) {
+  const key = req.headers.get("Idempotency-Key");
+  if (!key) throw new BadRequest("Idempotency-Key required");
+
+  const existing = await db.idempotencyKeys.findOne({ key });
+  if (existing) {
+    if (existing.status === "in_progress") {
+      throw new Conflict("Request with this key is already being processed");
+    }
+    return existing.response; // safe to replay
+  }
+
+  await db.idempotencyKeys.insert({ key, status: "in_progress" });
+
+  const charge = await paymentProvider.charge(req.body);
+
+  await db.idempotencyKeys.update(
+    { key },
+    { status: "completed", response: charge }
+  );
+
+  return charge;
+}
+```
+
+The key is scoped to the client's intent, not the request's contents — the client generates it once per logical operation (once per "user clicked Pay") and reuses the same key on every retry of that same operation, even though the retries are technically separate HTTP requests.
+
+<Callout type="tip">
+Generate idempotency keys client-side with a UUID, and hold onto the same key across retries of the same user action — regenerating it on retry defeats the entire mechanism, since the server sees what looks like a brand-new operation each time.
+</Callout>
+
+## The Race Condition Everyone Misses First
+
+The naive implementation above — check if the key exists, then insert — has a race: two requests carrying the same key can both pass the "does it exist" check before either finishes inserting, and both proceed to charge the card. The fix is to make key registration itself atomic, using a unique constraint the database enforces rather than an application-level check-then-act.
+
+```sql
+CREATE TABLE idempotency_keys (
+  key TEXT PRIMARY KEY,
+  status TEXT NOT NULL,
+  response JSONB,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+-- Atomic: the second concurrent insert with the same key fails here,
+-- not after both requests have already started doing the work.
+INSERT INTO idempotency_keys (key, status) VALUES ($1, 'in_progress');
+```
+
+<Callout type="warning">
+A distributed cache with `SETNX` works the same way as a unique constraint — the point is that whatever store you use, the "claim this key" step has to be a single atomic operation, not a read followed by a separate write.
+</Callout>
+
+## Idempotency Isn't Free
+
+Storing keys costs storage, and they need a retention policy — keeping them forever isn't necessary, but expiring them too soon reopens the double-processing window if a client retries after a long delay. A common choice is 24 hours, long enough to cover realistic retry windows including a client that queues a retry after being offline.
+
+## Takeaway
+
+Idempotency is what makes retries — an unavoidable fact of unreliable networks — safe rather than dangerous. Naturally idempotent operations like `PUT` and `DELETE` get this for free if implemented correctly; everything else, especially `POST`, needs an explicit idempotency key that the server checks atomically before doing any real work, with the response cached and replayed on any retry carrying the same key.

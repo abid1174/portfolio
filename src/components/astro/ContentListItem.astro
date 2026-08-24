@@ -1,0 +1,131 @@
+---
+import { ArrowUpRight } from 'lucide-react';
+import DifficultyBadge from './DifficultyBadge.astro';
+import type { ContentEntry } from '../../lib/content';
+import { formatDate, isoDate } from '../../lib/utils';
+
+interface Props {
+  entry: ContentEntry;
+  /** Sequence number shown in the gutter. */
+  index?: number;
+  showDate?: boolean;
+}
+
+const { entry, index, showDate = false } = Astro.props;
+---
+
+<li class="list-item">
+  <a href={entry.url} class="list-link">
+    {
+      index !== undefined && (
+        <span class="list-index" aria-hidden="true">
+          {String(index).padStart(2, '0')}
+        </span>
+      )
+    }
+
+    <span class="list-main">
+      <span class="list-title">{entry.title}</span>
+      <span class="list-meta">
+        <span class="list-category">{entry.category}</span>
+        <span class="list-sep" aria-hidden="true">·</span>
+        <span class="list-time">{entry.readingTime} min</span>
+        <span class="list-sep" aria-hidden="true">·</span>
+        <DifficultyBadge difficulty={entry.difficulty} />
+        {
+          showDate && (
+            <>
+              <span class="list-sep" aria-hidden="true">
+                ·
+              </span>
+              <time datetime={isoDate(entry.updatedAt)}>{formatDate(entry.updatedAt)}</time>
+            </>
+          )
+        }
+      </span>
+    </span>
+
+    <ArrowUpRight className="list-arrow" size={14} strokeWidth={2} aria-hidden="true" />
+  </a>
+</li>
+
+<style>
+  .list-item + .list-item {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .list-link {
+    display: flex;
+    align-items: flex-start;
+    gap: 0.7rem;
+    padding: 0.7rem 0.6rem;
+    margin-inline: -0.6rem;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    color: inherit;
+    transition: background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .list-link:hover {
+    background: var(--pillar-wash);
+  }
+
+  .list-index {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    padding-top: 0.2rem;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .list-main {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    flex: 1;
+  }
+
+  .list-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.4;
+    color: var(--text-primary);
+  }
+
+  .list-link:hover .list-title {
+    color: var(--pillar);
+  }
+
+  .list-meta {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+
+  .list-sep {
+    opacity: 0.5;
+  }
+
+  :global(.list-arrow) {
+    flex-shrink: 0;
+    margin-top: 0.25rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transform: translate(-2px, 2px);
+    transition:
+      opacity var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+  }
+
+  .list-link:hover :global(.list-arrow),
+  .list-link:focus-visible :global(.list-arrow) {
+    opacity: 1;
+    transform: none;
+    color: var(--pillar);
+  }
+</style>

@@ -1,0 +1,204 @@
+---
+import { Menu, X } from 'lucide-react';
+import SearchCommand from '../react/SearchCommand';
+import { isActiveRoute, navigation } from '../../data/navigation';
+import { site } from '../../data/site';
+
+const pathname = Astro.url.pathname;
+const current = navigation.find((item) => !item.action && isActiveRoute(item.href, pathname));
+---
+
+<header class="header">
+  <div class="header-inner">
+    <button
+      type="button"
+      class="drawer-toggle"
+      data-drawer-toggle
+      aria-controls="site-sidebar"
+      aria-expanded="false"
+      aria-label="Open navigation menu"
+    >
+      <Menu className="icon-open" size={18} strokeWidth={2} aria-hidden="true" />
+      <X className="icon-close" size={18} strokeWidth={2} aria-hidden="true" />
+    </button>
+
+    <a class="header-brand" href="/">
+      <span class="brand-mark" aria-hidden="true">{site.avatarInitials}</span>
+      <span class="brand-name">{site.name}</span>
+    </a>
+
+    <p class="header-section">
+      <span class="header-slash" aria-hidden="true">/</span>
+      {current?.label ?? 'Notes'}
+    </p>
+
+    <div class="header-actions">
+      <SearchCommand client:idle />
+    </div>
+  </div>
+</header>
+
+<script>
+  /**
+   * Mobile drawer. Vanilla on purpose: navigation is the one thing
+   * that must work before any framework runtime has loaded.
+   */
+  const toggle = document.querySelector<HTMLButtonElement>('[data-drawer-toggle]');
+  const scrim = document.querySelector<HTMLElement>('[data-drawer-scrim]');
+  const sidebar = document.getElementById('site-sidebar');
+
+  if (toggle && sidebar) {
+    const setOpen = (open: boolean) => {
+      document.body.dataset.drawer = open ? 'open' : 'closed';
+      toggle.setAttribute('aria-expanded', String(open));
+      toggle.setAttribute(
+        'aria-label',
+        open ? 'Close navigation menu' : 'Open navigation menu',
+      );
+      if (open) {
+        sidebar.querySelector<HTMLElement>('a, button')?.focus();
+      }
+    };
+
+    toggle.addEventListener('click', () => {
+      setOpen(document.body.dataset.drawer !== 'open');
+    });
+
+    scrim?.addEventListener('click', () => setOpen(false));
+
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape' && document.body.dataset.drawer === 'open') {
+        setOpen(false);
+        toggle.focus();
+      }
+    });
+
+    // Following a link inside the drawer should close it.
+    sidebar.addEventListener('click', (event) => {
+      if ((event.target as HTMLElement).closest('a')) setOpen(false);
+    });
+
+    // Keep state honest when resizing past the drawer breakpoint.
+    const wide = window.matchMedia('(min-width: 64rem)');
+    wide.addEventListener('change', (event) => {
+      if (event.matches) setOpen(false);
+    });
+  }
+</script>
+
+<style>
+  .header {
+    position: sticky;
+    top: 0;
+    z-index: 40;
+    height: var(--header-height);
+    border-bottom: 1px solid var(--border-subtle);
+    background: color-mix(in oklab, var(--bg-primary) 82%, transparent);
+    backdrop-filter: blur(12px);
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    height: 100%;
+    max-width: var(--content-max);
+    margin-inline: auto;
+    padding-inline: clamp(1rem, 3vw, 2rem);
+  }
+
+  .drawer-toggle {
+    display: none;
+    place-items: center;
+    width: 2rem;
+    height: 2rem;
+    flex-shrink: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-secondary);
+    cursor: pointer;
+  }
+  .drawer-toggle:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+  .drawer-toggle :global(.icon-close) {
+    display: none;
+  }
+  :global(body[data-drawer='open']) .drawer-toggle :global(.icon-open) {
+    display: none;
+  }
+  :global(body[data-drawer='open']) .drawer-toggle :global(.icon-close) {
+    display: block;
+  }
+
+  .header-brand {
+    display: none;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    min-width: 0;
+  }
+
+  .brand-mark {
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    border-radius: 5px;
+    border: 1px solid var(--border-default);
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .brand-name {
+    font-size: 0.8125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-section {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .header-slash {
+    color: var(--border-strong);
+  }
+
+  .header-actions {
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  @media (max-width: 64rem) {
+    .drawer-toggle {
+      display: grid;
+    }
+    .header-brand {
+      display: flex;
+    }
+    .header-section {
+      display: none;
+    }
+  }
+</style>

@@ -1,0 +1,21 @@
+---
+import ContentCard from './ContentCard.astro';
+import type { ContentEntry } from '../../lib/content';
+
+interface Props {
+  entry: ContentEntry;
+  variant?: 'default' | 'compact';
+}
+
+const { entry, variant = 'default' } = Astro.props;
+---
+
+<div class="pillar-ai">
+  <ContentCard entry={entry} variant={variant} />
+</div>
+
+<style>
+  div {
+    height: 100%;
+  }
+</style>

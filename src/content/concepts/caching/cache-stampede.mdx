@@ -1,0 +1,107 @@
+---
+title: "What is a Cache Stampede?"
+description: "A cache stampede happens when a popular cached value expires and every waiting request rushes the origin at once, turning a cache miss into a self-inflicted denial of service."
+type: "concept"
+category: "Caching"
+tags: ["Caching", "Redis", "Performance", "Scalability"]
+difficulty: "intermediate"
+readingTime: 8
+publishedAt: "2026-06-08"
+updatedAt: "2026-06-20"
+featured: false
+related: ["concepts/database-index", "concepts/consistent-hashing", "system-design/rate-limiter"]
+---
+
+A cache exists to protect your database from load. A cache stampede is the failure mode where the cache stops doing that job at exactly the worst moment: a hot key expires, and every one of the thousand requests that were relying on it hits the origin simultaneously, often enough to take the origin down.
+
+## How It Happens
+
+Picture a product page cached under key `product:8231`, serving a thousand requests per second, with a five-minute TTL. At the moment that TTL expires, the next request finds a cache miss, queries the database, and repopulates the cache — that part is fine in isolation. The problem is that it isn't one request finding the miss. It's every one of the requests that arrive in the window between expiration and repopulation, and at a thousand requests per second, that window doesn't need to be long to produce hundreds or thousands of identical, redundant queries landing on the database at once.
+
+```
+t=0ms    key expires
+t=0ms    request A: cache miss, starts DB query
+t=2ms    request B: cache miss, starts DB query
+t=4ms    request C: cache miss, starts DB query
+...      (200+ more identical misses before A's query returns)
+t=45ms   request A's DB query returns, repopulates cache
+```
+
+A database that comfortably serves the cached read load can be caught completely off guard by even a fraction of that load arriving as uncached, full queries at once — especially if the underlying query is expensive (aggregations, joins, full-text search).
+
+## Why Popular Keys Make It Worse
+
+The keys most likely to cause a stampede are exactly the ones you'd assume are safest: the hottest, most frequently accessed data. A rarely-requested key expiring causes at most a handful of redundant queries. A viral product page, a trending post, a homepage feed — anything serving hundreds or thousands of requests per second — turns every single TTL expiration into a burst proportional to that traffic. This is why stampedes tend to appear suddenly in production on your most-loved content, not your long tail.
+
+<Callout type="warning">
+Stampedes often masquerade as a database performance problem. The graphs show a spike in DB load and slow queries, and the instinct is to add an index or scale the database — when the actual fix belongs entirely in the caching layer.
+</Callout>
+
+## Mitigation: Locking (Single-Flight)
+
+The most direct fix is to ensure only one request recomputes a given key at a time, while everyone else either waits briefly or serves the stale value. This pattern is often called single-flight or mutex-based recomputation.
+
+```ts
+async function getProduct(id: string) {
+  const cached = await redis.get(`product:${id}`);
+  if (cached) return JSON.parse(cached);
+
+  const lockKey = `lock:product:${id}`;
+  const gotLock = await redis.set(lockKey, "1", "NX", "EX", 10);
+
+  if (gotLock) {
+    try {
+      const product = await db.products.findById(id);
+      await redis.set(`product:${id}`, JSON.stringify(product), "EX", 300);
+      return product;
+    } finally {
+      await redis.del(lockKey);
+    }
+  } else {
+    // Someone else is already recomputing; wait briefly and retry the cache
+    await sleep(50);
+    return getProduct(id);
+  }
+}
+```
+
+Only the request that acquires the lock hits the database; everyone else backs off and rechecks the cache shortly after, so the database sees one query instead of a thousand.
+
+## Mitigation: Probabilistic Early Expiration
+
+Locking works but adds latency for the waiting requests. An alternative — used internally at large scale by systems like Facebook's caching layer — has each request probabilistically decide to recompute the value slightly before it actually expires, with the probability rising as the true expiration approaches. This spreads recomputation across many requests over a small window instead of concentrating it all at the exact expiration instant, and no single request is ever fully blocked waiting on a lock.
+
+<Callout type="tip">
+The core idea, sometimes called XFetch: store a recompute cost estimate alongside the value, and on each read compute `now - (ttl * beta * random() * cost) >= expiry`. Tune `beta` up to recompute earlier and more conservatively, down to shave closer to the real expiration.
+</Callout>
+
+## Mitigation: Stale-While-Revalidate
+
+Rather than treating expiration as a hard cliff, serve the stale value immediately while refreshing it in the background. Callers never wait on the recompute at all, at the cost of occasionally serving slightly outdated data.
+
+```http
+Cache-Control: max-age=300, stale-while-revalidate=60
+```
+
+This header tells a compliant cache: serve from cache for 300 seconds, and for up to 60 seconds after that, keep serving the stale copy while triggering a background refresh, rather than blocking the request on a fresh fetch.
+
+## Comparing the Options
+
+| Strategy | Blocks the requester | Extra infra needed | Best when |
+|---|---|---|---|
+| Mutex / single-flight lock | Briefly, for non-lock-holders | Distributed lock (Redis `SETNX`) | Strong consistency preferred over staleness |
+| Probabilistic early expiration | No | Small metadata per cache entry | High-traffic keys, some staleness tolerable |
+| Stale-while-revalidate | No | Cache/CDN support for the directive | Read-heavy, latency-sensitive endpoints |
+| No TTL, explicit invalidation | No | Reliable invalidation on writes | Data that changes on a known event, not on a clock |
+
+<Callout type="insight">
+Notice the last row: the simplest fix for a lot of stampede-prone caches is to stop expiring on a timer at all. If you can invalidate the cache precisely when the underlying data changes — on the write path — you remove the recurring expiration event that causes stampedes in the first place. TTLs are a safety net for invalidation you don't trust, not a substitute for it.
+</Callout>
+
+## Jitter Alone Isn't Enough
+
+A common half-fix is adding random jitter to TTLs so keys don't all expire at the exact same second. That helps when many different keys share a fixed TTL and would otherwise expire in lockstep, but it does nothing for a single hot key — jittering `product:8231`'s own TTL doesn't stop a thousand concurrent requests from racing to repopulate it the moment it expires. Jitter and single-flight/stale-while-revalidate solve different problems and are often needed together.
+
+## Takeaway
+
+A cache stampede turns a single expiration event into a burst of redundant, simultaneous origin queries, and it hits your most popular keys hardest. Fix it by ensuring only one request recomputes a given key at a time (locking), spreading recomputation out before the hard expiration (probabilistic early expiration), or removing the wait entirely by serving stale data during a background refresh (stale-while-revalidate) — and where possible, invalidate on writes instead of relying on a TTL to eventually catch up.

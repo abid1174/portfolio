@@ -1,0 +1,102 @@
+---
+import { ArrowRight } from 'lucide-react';
+import ContentListItem from '../ContentListItem.astro';
+import { ContentRepository } from '../../../lib/content';
+import { pillarList } from '../../../data/topics';
+
+// Each column is a live view of its collection.
+const columns = await Promise.all(
+  pillarList.map(async (pillar) => ({
+    pillar,
+    entries: await ContentRepository.latest(pillar.id, 5),
+  })),
+);
+---
+
+<section class="latest" aria-labelledby="latest-title">
+  <h2 class="sr-only" id="latest-title">Latest content</h2>
+
+  <div class="columns">
+    {
+      columns.map(({ pillar, entries }) => (
+        <section
+          class:list={['column', pillar.accentClass]}
+          aria-labelledby={`latest-${pillar.id}`}
+        >
+          <header class="column-head">
+            <h3 class="label-mono" id={`latest-${pillar.id}`}>
+              {pillar.label}
+            </h3>
+            <a class="column-link" href={pillar.href} aria-label={`All ${pillar.label}`}>
+              <ArrowRight size={13} strokeWidth={2} aria-hidden="true" />
+            </a>
+          </header>
+
+          <ul>
+            {entries.map((entry, i) => (
+              <ContentListItem entry={entry} index={i + 1} />
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</section>
+
+<style>
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .column {
+    padding: 0.9rem 1rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .column-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    padding-bottom: 0.6rem;
+    margin-bottom: 0.25rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  .column-head h3 {
+    margin: 0;
+    color: var(--pillar);
+  }
+
+  .column-link {
+    display: grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    border-radius: var(--radius-sm);
+    color: var(--text-muted);
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+  .column-link:hover {
+    color: var(--pillar);
+    background: var(--pillar-wash);
+  }
+
+  ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  @media (max-width: 62rem) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

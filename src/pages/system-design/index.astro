@@ -1,0 +1,87 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import ContentLibrary from '../../components/astro/ContentLibrary.astro';
+import SectionHeader from '../../components/astro/SectionHeader.astro';
+import { breadcrumbJsonLd } from '../../lib/metadata';
+import { pillars } from '../../data/topics';
+import { ContentRepository } from '../../lib/content';
+
+const pillar = pillars['system-design'];
+const entries = await ContentRepository.byPillar('system-design');
+const totalMinutes = entries.reduce((sum, entry) => sum + entry.readingTime, 0);
+---
+
+<PageLayout
+  title={pillar.label}
+  description={pillar.description}
+  pillar="system-design"
+  pillarClass={pillar.accentClass}
+  jsonLd={[breadcrumbJsonLd([{ label: 'Home', href: '/' }, { label: pillar.label }])]}
+>
+  <div class="page">
+    <SectionHeader
+      level="page"
+      eyebrow={`${entries.length} walkthroughs · ${totalMinutes} minutes of reading`}
+      title="System Design Practices"
+      description={pillar.heroDescription}
+    />
+
+    <ol class="method" aria-label="How each walkthrough is structured">
+      {
+        [
+          'Problem & requirements',
+          'Capacity estimation',
+          'API and data model',
+          'Architecture & deep dive',
+          'Failure, scale, trade-offs',
+        ].map((step, i) => (
+          <li>
+            <span class="step-no">{String(i + 1).padStart(2, '0')}</span>
+            <span>{step}</span>
+          </li>
+        ))
+      }
+    </ol>
+
+    <ContentLibrary
+      pillar="system-design"
+      layout="grid"
+      showDifficulty
+      placeholder="Search system designs…"
+    />
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: 2rem;
+  }
+
+  .method {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .method li {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.3rem 0.7rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+  }
+
+  .step-no {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    color: var(--pillar);
+  }
+</style>

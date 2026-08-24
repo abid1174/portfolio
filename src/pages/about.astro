@@ -1,0 +1,311 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import SectionHeader from '../components/astro/SectionHeader.astro';
+import InteractiveDiagram from '../components/react/InteractiveDiagram';
+import BrandIcon from '../components/astro/BrandIcon.astro';
+import { Mail } from 'lucide-react';
+import { breadcrumbJsonLd } from '../lib/metadata';
+import { ContentRepository } from '../lib/content';
+import { site } from '../data/site';
+
+const stats = await ContentRepository.stats();
+
+const layers = [
+  {
+    id: 'concepts',
+    label: 'Concepts',
+    summary: 'The vocabulary everything else is written in.',
+    detail:
+      'Single ideas, explained once and properly. A concept page exists because I had to look the idea up more than twice, or because the explanations I found skipped the part that actually mattered.',
+    items: [
+      'Authentication and tokens',
+      'Networking and protocols',
+      'Databases, indexes, caching',
+      'Distributed systems primitives',
+    ],
+    accent: 'var(--accent-blue)',
+  },
+  {
+    id: 'system-design',
+    label: 'System Design',
+    summary: 'Concepts assembled into something that has to survive production.',
+    detail:
+      'Each walkthrough follows the same twelve sections so designs can be compared rather than admired. The interesting part is never the boxes — it is the capacity numbers and the failure handling that force the boxes to be what they are.',
+    items: [
+      'Requirements before architecture',
+      'Capacity estimation with real arithmetic',
+      'Explicit trade-offs and decisions',
+      'What breaks, and what happens then',
+    ],
+    accent: 'var(--accent-purple)',
+  },
+  {
+    id: 'ai',
+    label: 'AI Learning',
+    summary: 'The newest layer, and the one changing fastest.',
+    detail:
+      'Notes on how retrieval, embeddings, agents and evaluation actually behave when wired into a backend. Written from the same angle as the rest of the site: mechanisms and costs, not capabilities and hype.',
+    items: [
+      'Retrieval and embeddings',
+      'Agents and tool calling',
+      'Evaluation that means something',
+      'Serving and infrastructure',
+    ],
+    accent: 'var(--accent-cyan)',
+  },
+];
+
+const principles = [
+  {
+    title: 'Explain the mechanism',
+    body: 'If a page cannot say what actually happens on the wire, in memory, or on disk, it is not finished.',
+  },
+  {
+    title: 'Show the numbers',
+    body: 'Capacity, latency budgets and failure rates decide architecture. Designs without arithmetic are opinions.',
+  },
+  {
+    title: 'Name the trade-off',
+    body: 'Every choice costs something. The page should say what, not just recommend the winner.',
+  },
+  {
+    title: 'Revise in public',
+    body: 'Pages get corrected as I learn more. The updated date is meaningful, not decorative.',
+  },
+];
+---
+
+<PageLayout
+  title="About"
+  description={`${site.name} — ${site.role}. ${site.bio}`}
+  jsonLd={[breadcrumbJsonLd([{ label: 'Home', href: '/' }, { label: 'About' }])]}
+>
+  <div class="page">
+    <SectionHeader level="page" eyebrow="About" title={site.name} description={site.bio} />
+
+    <div class="intro">
+      <div class="intro-copy">
+        <p>
+          I am a {site.role.toLowerCase()} working mostly on backend and distributed systems. This
+          site is the notebook I wish I had when I started: {stats.total} entries covering the concepts
+          I rely on, the system designs I have worked through, and what I am currently learning about
+          AI.
+        </p>
+        <p>
+          It is not a portfolio and it is not a blog. There is no posting schedule. Pages appear
+          when I understand something well enough to explain it, and get revised when I realise
+          I did not.
+        </p>
+
+        <ul class="contact">
+          <li>
+            <a href={site.social[0].href} target="_blank" rel="me noopener noreferrer">
+              <BrandIcon name="GitHub" />
+              {site.social[0].handle}
+            </a>
+          </li>
+          <li>
+            <a href={site.social[1].href} target="_blank" rel="me noopener noreferrer">
+              <BrandIcon name="LinkedIn" />
+              {site.social[1].handle}
+            </a>
+          </li>
+          <li>
+            <a href={`mailto:${site.email}`}>
+              <Mail size={14} strokeWidth={2} aria-hidden="true" />
+              {site.email}
+            </a>
+          </li>
+        </ul>
+      </div>
+
+      <dl class="figures">
+        <div><dt>Concepts</dt><dd>{stats.concepts}</dd></div>
+        <div><dt>System designs</dt><dd>{stats.systemDesigns}</dd></div>
+        <div><dt>AI notes</dt><dd>{stats.ai}</dd></div>
+        <div><dt>Tags in use</dt><dd>{stats.tags}</dd></div>
+      </dl>
+    </div>
+
+    <section class="block">
+      <SectionHeader
+        eyebrow="How it is organised"
+        title="Three layers, one model"
+        description="Each layer depends on the one above it. Select a layer to see what belongs there."
+      />
+      <InteractiveDiagram client:visible layers={layers} />
+    </section>
+
+    <section class="block">
+      <SectionHeader eyebrow="House rules" title="How pages get written" />
+      <ul class="principles">
+        {
+          principles.map((principle, i) => (
+            <li>
+              <span class="principle-no" aria-hidden="true">
+                {String(i + 1).padStart(2, '0')}
+              </span>
+              <h3>{principle.title}</h3>
+              <p>{principle.body}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="block">
+      <SectionHeader eyebrow="Colophon" title="How it is built" />
+      <p class="colophon">
+        Astro with React islands, MDX content in Git, Zod-validated frontmatter, Tailwind on top
+        of CSS custom properties, and a client-side search index built at compile time. No
+        database, no CMS, no analytics. Bookmarks live in your browser and never leave it.
+      </p>
+    </section>
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: clamp(2rem, 5vw, 3rem);
+  }
+
+  .block {
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .intro {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 16rem);
+    gap: 2rem;
+    align-items: start;
+  }
+
+  .intro-copy p {
+    margin: 0 0 1rem;
+    max-width: 62ch;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  .contact {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 1.25rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .contact a {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.65rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+  .contact a:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+
+  .figures {
+    display: grid;
+    gap: 0;
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    overflow: hidden;
+    background: var(--surface);
+  }
+
+  .figures > div {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.6rem 0.9rem;
+  }
+  .figures > div + div {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .figures dt {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .figures dd {
+    margin: 0;
+    font-size: 1.125rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .principles {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .principles li {
+    padding: 1rem 1.05rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .principle-no {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--accent-blue);
+  }
+
+  .principles h3 {
+    margin: 0.35rem 0 0.4rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .principles p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  .colophon {
+    margin: 0;
+    max-width: 62ch;
+    font-size: 0.9375rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  @media (max-width: 60rem) {
+    .intro {
+      grid-template-columns: 1fr;
+    }
+    .principles {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

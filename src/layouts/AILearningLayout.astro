@@ -1,0 +1,35 @@
+---
+import type { MarkdownHeading } from 'astro';
+import ArticleLayout from './ArticleLayout.astro';
+import type { ContentEntry } from '../lib/content';
+
+interface Props {
+  entry: ContentEntry;
+  headings: MarkdownHeading[];
+}
+
+const { entry, headings } = Astro.props;
+---
+
+<ArticleLayout entry={entry} headings={headings}>
+  <p slot="header-extra" class="ai-note">
+    Notes from working through this in practice. Model behaviour moves quickly — where a detail
+    depends on a specific model, it is called out inline.
+  </p>
+
+  <slot />
+</ArticleLayout>
+
+<style>
+  .ai-note {
+    margin: 1.25rem 0 0;
+    padding: 0.6rem 0.85rem;
+    border-left: 2px solid var(--pillar);
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+    background: var(--pillar-wash);
+    font-size: 0.8125rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: 58ch;
+  }
+</style>

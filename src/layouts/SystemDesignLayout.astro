@@ -1,0 +1,98 @@
+---
+import type { MarkdownHeading } from 'astro';
+import ArticleLayout from './ArticleLayout.astro';
+import ArchitectureDiagram from '../components/astro/ArchitectureDiagram.astro';
+import type { ContentEntry } from '../lib/content';
+
+interface Props {
+  entry: ContentEntry;
+  headings: MarkdownHeading[];
+}
+
+const { entry, headings } = Astro.props;
+
+const diagram = (entry.diagram ?? 'mesh') as
+  'fanout' | 'keyvalue' | 'realtime' | 'pipeline' | 'storage' | 'mesh';
+
+// The fixed section order these articles follow, surfaced as a brief.
+const brief = [
+  { label: 'Category', value: entry.category, capitalize: false },
+  { label: 'Level', value: entry.difficulty, capitalize: true },
+  { label: 'Target scale', value: entry.scale ?? '—', capitalize: false },
+  { label: 'Depth', value: `${entry.readingTime} min read`, capitalize: false },
+];
+---
+
+{/* System designs get a two-level TOC: the twelve fixed sections. */}
+<ArticleLayout entry={entry} headings={headings} tocDepth={2}>
+  <div slot="header-extra" class="brief">
+    <dl>
+      {
+        brief.map((item) => (
+          <div>
+            <dt>{item.label}</dt>
+            <dd class:list={[item.capitalize && 'is-capitalized']}>{item.value}</dd>
+          </div>
+        ))
+      }
+    </dl>
+    <div class="brief-thumb" aria-hidden="true">
+      <ArchitectureDiagram variant={diagram} />
+    </div>
+  </div>
+
+  <slot />
+</ArticleLayout>
+
+<style>
+  .brief {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 9rem;
+    gap: 1rem;
+    align-items: center;
+    margin-top: 1.5rem;
+    padding: 0.85rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: linear-gradient(to right, var(--pillar-wash), transparent 70%), var(--surface);
+  }
+
+  dl {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(6.5rem, 1fr));
+    gap: 0.75rem 1rem;
+    margin: 0;
+  }
+
+  dt {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  dd {
+    margin: 0.2rem 0 0;
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--text-primary);
+  }
+
+  .is-capitalized {
+    text-transform: capitalize;
+  }
+
+  .brief-thumb {
+    opacity: 0.9;
+  }
+
+  @media (max-width: 44rem) {
+    .brief {
+      grid-template-columns: 1fr;
+    }
+    .brief-thumb {
+      display: none;
+    }
+  }
+</style>

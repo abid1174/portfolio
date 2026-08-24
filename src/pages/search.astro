@@ -1,0 +1,118 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import SectionHeader from '../components/astro/SectionHeader.astro';
+import ContentListItem from '../components/astro/ContentListItem.astro';
+import SearchCommand from '../components/react/SearchCommand';
+import { ContentRepository } from '../lib/content';
+import { pillarList } from '../data/topics';
+
+/**
+ * A real page rather than a redirect, so `/search?q=…` is linkable
+ * and crawlable, and so search still leads somewhere without JS.
+ */
+const query = Astro.url.searchParams.get('q') ?? '';
+const columns = await Promise.all(
+  pillarList.map(async (pillar) => ({
+    pillar,
+    entries: await ContentRepository.latest(pillar.id, 8),
+  })),
+);
+---
+
+<PageLayout
+  title="Search"
+  description="Search every concept, system design and AI note on this site."
+  noindex
+>
+  <div class="page">
+    <SectionHeader
+      level="page"
+      eyebrow="Everything, one field"
+      title="Search"
+      description="Titles, descriptions, tags, categories and article text. Press ⌘K or / from anywhere on the site."
+    />
+
+    <SearchCommand client:load alwaysOpen initialQuery={query} />
+
+    <p class="fallback-note">
+      The dialog opens automatically. If JavaScript is unavailable, browse the full index below.
+    </p>
+
+    <div class="columns">
+      {
+        columns.map(({ pillar, entries }) => (
+          <section class={pillar.accentClass} aria-labelledby={`search-${pillar.id}`}>
+            <h2 class="label-mono" id={`search-${pillar.id}`}>
+              {pillar.label}
+            </h2>
+            <ul>
+              {entries.map((entry) => (
+                <ContentListItem entry={entry} />
+              ))}
+            </ul>
+            <a class="column-all" href={pillar.href}>
+              All {pillar.label} →
+            </a>
+          </section>
+        ))
+      }
+    </div>
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: 1.75rem;
+  }
+
+  .fallback-note {
+    margin: 0;
+    font-size: 0.8125rem;
+    color: var(--text-muted);
+  }
+
+  .columns {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+  }
+
+  .columns > section {
+    padding: 0.9rem 1rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .columns h2 {
+    margin: 0 0 0.6rem;
+    padding-bottom: 0.6rem;
+    border-bottom: 1px solid var(--border-subtle);
+    color: var(--pillar);
+  }
+
+  .columns ul {
+    margin: 0 0 0.75rem;
+    padding: 0;
+    list-style: none;
+  }
+
+  .column-all {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-decoration: none;
+  }
+  .column-all:hover {
+    color: var(--pillar);
+  }
+
+  @media (max-width: 62rem) {
+    .columns {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

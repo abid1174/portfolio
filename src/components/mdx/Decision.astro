@@ -1,0 +1,90 @@
+---
+import { CircleCheckBig } from 'lucide-react';
+
+interface Props {
+  title: string;
+  choice?: string;
+}
+
+const { title, choice } = Astro.props;
+---
+
+<figure class="decision">
+  <figcaption class="decision-head">
+    <CircleCheckBig size={14} strokeWidth={2} aria-hidden="true" />
+    <div>
+      <p class="decision-label">Decision</p>
+      <h4 class="decision-title">{title}</h4>
+    </div>
+  </figcaption>
+
+  {choice && <p class="decision-choice">{choice}</p>}
+
+  <div class="decision-body"><slot /></div>
+</figure>
+
+<style>
+  .decision {
+    position: relative;
+    margin-block: 2rem;
+    padding: 1.05rem 1.15rem 1.15rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background:
+      linear-gradient(to bottom right, var(--wash-purple), transparent 55%), var(--surface);
+  }
+
+  .decision-head {
+    display: flex;
+    gap: 0.65rem;
+    align-items: flex-start;
+  }
+  .decision-head :global(svg) {
+    color: var(--accent-purple);
+    flex-shrink: 0;
+    margin-top: 0.85rem;
+  }
+
+  .decision-label {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent-purple);
+  }
+
+  .decision-title {
+    margin: 0.15rem 0 0;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .decision-choice {
+    margin: 0.7rem 0 0;
+    padding: 0.4rem 0.6rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface-inset);
+    border: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--text-primary);
+    max-width: none;
+  }
+
+  .decision-body {
+    margin-top: 0.75rem;
+    font-size: 0.9375rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+  }
+  .decision-body :global(p) {
+    margin: 0;
+    max-width: none;
+  }
+  .decision-body :global(> * + *) {
+    margin-top: 0.7em;
+  }
+</style>

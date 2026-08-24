@@ -1,0 +1,103 @@
+---
+import { Calculator } from 'lucide-react';
+
+interface CapacityItem {
+  label: string;
+  value: string;
+  note?: string;
+}
+
+interface Props {
+  title?: string;
+  items?: CapacityItem[];
+}
+
+const { title = 'Back-of-the-envelope', items = [] } = Astro.props;
+---
+
+<figure class="capacity">
+  <figcaption class="capacity-head">
+    <Calculator size={13} strokeWidth={2} aria-hidden="true" />
+    <span>{title}</span>
+  </figcaption>
+  <dl class="capacity-grid">
+    {
+      items.map((item) => (
+        <div class="capacity-item">
+          <dt>{item.label}</dt>
+          <dd class="capacity-value">{item.value}</dd>
+          {item.note && <dd class="capacity-note">{item.note}</dd>}
+        </div>
+      ))
+    }
+  </dl>
+</figure>
+
+<style>
+  .capacity {
+    margin-block: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .capacity-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .capacity-head :global(svg) {
+    color: var(--pillar);
+  }
+
+  .capacity-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(11rem, 1fr));
+    margin: 0;
+  }
+
+  .capacity-item {
+    padding: 0.9rem 1rem 1rem;
+    border-top: 1px solid var(--border-subtle);
+    border-right: 1px solid var(--border-subtle);
+  }
+  /* Only the first row sits flush against the header. */
+  .capacity-item:first-child {
+    border-top: 0;
+  }
+
+  .capacity-item dt {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .capacity-value {
+    margin: 0.3rem 0 0;
+    font-size: 1.375rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    color: var(--text-primary);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .capacity-note {
+    margin: 0.2rem 0 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    line-height: 1.45;
+  }
+</style>

@@ -1,0 +1,41 @@
+---
+import PageLayout from '../../layouts/PageLayout.astro';
+import ContentLibrary from '../../components/astro/ContentLibrary.astro';
+import SectionHeader from '../../components/astro/SectionHeader.astro';
+import { breadcrumbJsonLd } from '../../lib/metadata';
+import { pillars } from '../../data/topics';
+import { ContentRepository } from '../../lib/content';
+
+const pillar = pillars.concepts;
+const count = (await ContentRepository.byPillar('concepts')).length;
+---
+
+<PageLayout
+  title={pillar.label}
+  description={pillar.description}
+  pillar="concepts"
+  pillarClass={pillar.accentClass}
+  jsonLd={[breadcrumbJsonLd([{ label: 'Home', href: '/' }, { label: pillar.label }])]}
+>
+  <div class="page">
+    <SectionHeader
+      level="page"
+      eyebrow={`${count} entries · Knowledge library`}
+      title={pillar.label}
+      description={pillar.heroDescription}
+    />
+    <ContentLibrary
+      pillar="concepts"
+      layout="grouped"
+      showDifficulty
+      placeholder="Search concepts…"
+    />
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: 2rem;
+  }
+</style>

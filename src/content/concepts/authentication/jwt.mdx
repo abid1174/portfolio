@@ -1,0 +1,115 @@
+---
+title: "What is a JWT?"
+description: "A JWT is a signed, self-contained token format that lets a server verify claims about a user without a database lookup, at the cost of being hard to revoke early."
+type: "concept"
+category: "Authentication"
+tags: ["JWT", "Authentication", "Security"]
+difficulty: "beginner"
+readingTime: 6
+publishedAt: "2026-04-15"
+updatedAt: "2026-05-02"
+featured: false
+related: ["concepts/pkce", "concepts/oauth-2", "concepts/idempotency"]
+---
+
+A JSON Web Token (JWT) is a compact, URL-safe string that encodes a set of claims and a signature proving those claims haven't been tampered with. It's the format behind most "stateless" auth systems: instead of asking a database "is this session valid," the server just checks the signature.
+
+## Anatomy of a JWT
+
+A JWT is three base64url-encoded segments joined by dots: `header.payload.signature`. Decoded, a typical one looks like this:
+
+```json
+{
+  "header": { "alg": "RS256", "typ": "JWT", "kid": "2026-04-key" },
+  "payload": {
+    "sub": "user_8231",
+    "iss": "https://auth.example.com",
+    "aud": "api.example.com",
+    "exp": 1786060800,
+    "iat": 1786057200,
+    "scope": "read:orders write:orders"
+  }
+}
+```
+
+The header names the signing algorithm and, usually, which key signed it. The payload carries the claims — who this is (`sub`), who issued it (`iss`), who it's for (`aud`), and when it expires (`exp`). The signature is computed over the header and payload and is what actually makes tampering detectable: change one character of the payload and the signature no longer matches.
+
+## Why Servers Like Them
+
+The whole appeal is that verification is local. A service holding the issuer's public key (or, for symmetric algorithms, the shared secret) can validate a token without calling back to an auth server or a session store. That removes a network hop and a shared point of failure from every authenticated request, which matters a lot once you're running dozens of services behind an API gateway.
+
+| Approach | Lookup per request | Revocation | Cross-service validation |
+|---|---|---|---|
+| Opaque session token | Yes, hits a store | Immediate | Requires shared store or introspection call |
+| JWT | No, local signature check | Only at expiry, or via a blocklist | Any service with the public key |
+
+<Tradeoff
+  optionA="Opaque tokens"
+  optionB="JWTs"
+  a={["Revocable instantly", "Requires a lookup per request", "Simple rotation"]}
+  b={["Stateless validation, no network hop", "Cannot be revoked before expiry without extra state", "Payload is visible to anyone holding the token"]}
+  recommendation="Use short-lived JWTs (5-15 minutes) for access tokens, paired with an opaque, revocable refresh token for renewing them."
+/>
+
+## Signing: HS256 vs RS256
+
+`HS256` (HMAC-SHA256) uses one shared secret for both signing and verifying. It's fast and simple but means every service that verifies tokens also holds a key capable of forging them — fine inside a single trusted service, risky once you hand that secret to a dozen microservices.
+
+`RS256` (RSA-SHA256) uses a private key to sign and a public key to verify. The auth server keeps the private key; every downstream service only ever needs the public key, which it can fetch from a JWKS endpoint. This is the right default for anything with more than one service verifying tokens.
+
+```ts
+import { SignJWT, jwtVerify, importPKCS8, importSPKI } from "jose";
+
+async function issueToken(privateKeyPem: string, sub: string) {
+  const privateKey = await importPKCS8(privateKeyPem, "RS256");
+  return new SignJWT({ scope: "read:orders" })
+    .setProtectedHeader({ alg: "RS256", kid: "2026-04-key" })
+    .setSubject(sub)
+    .setIssuedAt()
+    .setIssuer("https://auth.example.com")
+    .setAudience("api.example.com")
+    .setExpirationTime("15m")
+    .sign(privateKey);
+}
+
+async function verifyToken(publicKeyPem: string, token: string) {
+  const publicKey = await importSPKI(publicKeyPem, "RS256");
+  const { payload } = await jwtVerify(token, publicKey, {
+    issuer: "https://auth.example.com",
+    audience: "api.example.com",
+  });
+  return payload;
+}
+```
+
+<Callout type="warning" title="Never accept alg: none">
+The JWT spec technically allows an unsigned token via `alg: none`. Older libraries trusted whatever algorithm the token itself claimed, which let an attacker hand-craft a token, set `alg` to `none`, and skip signature verification entirely. Always pin the expected algorithm on the verifying side instead of trusting the header.
+</Callout>
+
+## JWTs Are Not Encrypted
+
+This trips people up constantly: base64url is an encoding, not encryption. Anyone holding a JWT can decode the payload and read every claim in it without any key at all.
+
+<Callout type="danger">
+Never put secrets, passwords, or anything sensitive directly into a JWT payload. If you genuinely need confidentiality, use a JWE (JSON Web Encryption) instead, or just keep the sensitive data out of the token and look it up server-side using the `sub` claim.
+</Callout>
+
+## The Revocation Problem
+
+Because verification is local, there's no natural place to say "this token is now invalid" before it expires. Common mitigations:
+
+- Keep access token lifetimes short (minutes, not hours) so the exposure window after a compromise is small.
+- Maintain a blocklist of revoked token IDs (`jti` claim) checked at the gateway — this reintroduces a lookup, trading away some of the statelessness benefit for cases like "user logged out" or "account compromised."
+- Rotate the signing key and reject tokens signed with retired keys, which revokes everything at once — useful for an incident, too blunt for revoking a single user's session.
+
+## Access Tokens vs Refresh Tokens
+
+Most systems don't rely on one JWT for everything. A short-lived JWT access token proves identity to resource servers; a longer-lived, opaque, revocable refresh token — stored server-side — is used only to mint new access tokens. This gets you the performance benefit of stateless validation for the high-volume path (every API call) while keeping a real revocation point for the low-volume path (refresh, logout, compromise response).
+
+<Callout type="insight">
+The refresh token is where your actual session state lives. The access token is closer to a temporary, cryptographically-backed cache of "this session was valid as of a few minutes ago."
+</Callout>
+
+## Takeaway
+
+A JWT is a signed bag of claims, not a secret container and not a session by itself. It buys you fast, local verification across services at the cost of hard revocation — so keep access tokens short-lived, use asymmetric signing (`RS256`) once more than one service verifies tokens, never trust the algorithm the token claims for itself, and pair JWTs with a real, revocable refresh token for anything that needs a hard logout.

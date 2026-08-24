@@ -1,0 +1,61 @@
+---
+import { difficultyAccent, type Difficulty } from '../../data/topics';
+
+interface Props {
+  difficulty: Difficulty;
+}
+
+const { difficulty } = Astro.props;
+const levels: Record<Difficulty, number> = {
+  beginner: 1,
+  intermediate: 2,
+  advanced: 3,
+};
+const filled = levels[difficulty];
+---
+
+<span class="difficulty" style={`--level-accent:${difficultyAccent[difficulty]}`}>
+  <span class="bars" aria-hidden="true">
+    {[1, 2, 3].map((step) => <i class:list={[step <= filled && 'on']} />)}
+  </span>
+  <span class="text">{difficulty}</span>
+</span>
+
+<style>
+  .difficulty {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.06em;
+    text-transform: capitalize;
+    color: var(--text-muted);
+  }
+
+  .bars {
+    display: inline-flex;
+    align-items: flex-end;
+    gap: 1.5px;
+    height: 9px;
+  }
+
+  .bars i {
+    display: block;
+    width: 2.5px;
+    background: var(--border-strong);
+    border-radius: 1px;
+  }
+  .bars i:nth-child(1) {
+    height: 3px;
+  }
+  .bars i:nth-child(2) {
+    height: 6px;
+  }
+  .bars i:nth-child(3) {
+    height: 9px;
+  }
+  .bars i.on {
+    background: var(--level-accent);
+  }
+</style>

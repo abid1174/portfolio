@@ -1,0 +1,128 @@
+---
+import { ArrowUpRight } from 'lucide-react';
+import type { ContentEntry } from '../../lib/content';
+import { pillars } from '../../data/topics';
+
+interface Props {
+  entries: ContentEntry[];
+  title?: string;
+}
+
+const { entries, title = 'Related reading' } = Astro.props;
+---
+
+{
+  entries.length > 0 && (
+    <section class="related" aria-labelledby="related-title">
+      <h2 class="label-mono" id="related-title">
+        {title}
+      </h2>
+      <ul>
+        {entries.map((entry) => (
+          <li class={pillars[entry.pillar].accentClass}>
+            <a href={entry.url}>
+              <span class="related-pillar">{pillars[entry.pillar].shortLabel}</span>
+              <span class="related-title">{entry.title}</span>
+              <span class="related-desc">{entry.description}</span>
+              <ArrowUpRight
+                className="related-arrow"
+                size={13}
+                strokeWidth={2}
+                aria-hidden="true"
+              />
+            </a>
+          </li>
+        ))}
+      </ul>
+    </section>
+  )
+}
+
+<style>
+  .related {
+    margin-top: 3rem;
+  }
+
+  #related-title {
+    margin: 0 0 1rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  #related-title::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-subtle);
+  }
+
+  ul {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(15rem, 1fr));
+    gap: 0.6rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  a {
+    position: relative;
+    display: grid;
+    gap: 0.25rem;
+    height: 100%;
+    padding: 0.8rem 0.9rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    text-decoration: none;
+    transition:
+      border-color var(--dur-base) var(--ease-out),
+      background-color var(--dur-base) var(--ease-out);
+  }
+
+  a:hover {
+    border-color: color-mix(in oklab, var(--pillar) 40%, var(--border-default));
+    background: var(--surface-hover);
+  }
+
+  .related-pillar {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--pillar);
+  }
+
+  .related-title {
+    font-size: 0.9375rem;
+    font-weight: 500;
+    line-height: 1.35;
+    color: var(--text-primary);
+    padding-right: 1.25rem;
+  }
+
+  .related-desc {
+    font-size: 0.8125rem;
+    line-height: 1.55;
+    color: var(--text-muted);
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  :global(.related-arrow) {
+    position: absolute;
+    top: 0.85rem;
+    right: 0.85rem;
+    color: var(--text-muted);
+    opacity: 0;
+    transition: opacity var(--dur-base) var(--ease-out);
+  }
+
+  a:hover :global(.related-arrow) {
+    opacity: 1;
+    color: var(--pillar);
+  }
+</style>

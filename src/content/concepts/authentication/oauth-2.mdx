@@ -1,0 +1,127 @@
+---
+title: "OAuth 2.0 Explained"
+description: "OAuth 2.0 is an authorization framework that lets one application access resources on a user's behalf without ever seeing that user's password."
+type: "concept"
+category: "Authentication"
+tags: ["OAuth", "Authentication", "Security", "API Design"]
+difficulty: "intermediate"
+readingTime: 9
+publishedAt: "2026-04-28"
+updatedAt: "2026-04-28"
+featured: false
+related: ["concepts/pkce", "concepts/jwt", "system-design/notification-system"]
+---
+
+OAuth 2.0 answers one specific question: how does app A get permission to act on a user's behalf against service B, without app A ever holding the user's credentials for service B? It's an authorization framework, not an authentication protocol — a distinction that causes more confusion than almost anything else in this space.
+
+## The Four Actors
+
+Every OAuth flow involves the same four roles, and keeping them straight makes the rest of the spec much easier to follow.
+
+| Role | Who it is | Example |
+|---|---|---|
+| Resource owner | The user | You, logging into a photo-printing app |
+| Client | The app requesting access | The photo-printing app |
+| Authorization server | Issues tokens after the user consents | Google's OAuth server |
+| Resource server | Holds the protected data, checks the token | Google Photos API |
+
+The client never sees the resource owner's password. It gets redirected to the authorization server, the user authenticates and consents there, and the client receives a token it can present to the resource server. The password stays exactly where it belongs — with the identity provider.
+
+## Grant Types
+
+OAuth defines several "grant types," each suited to a different kind of client.
+
+| Grant type | Use case | Status |
+|---|---|---|
+| Authorization code (+ PKCE) | Web apps, SPAs, mobile apps | Recommended default for anything with a user present |
+| Client credentials | Service-to-service, no user involved | Standard for machine-to-machine auth |
+| Refresh token | Renewing an access token without re-prompting the user | Used alongside the above |
+| Implicit | SPAs, historically | Deprecated, do not use for new work |
+| Resource owner password credentials | Legacy first-party apps | Deprecated, avoid entirely |
+
+<Callout type="warning" title="Skip implicit and password grants">
+Both hand the client a token directly in a redirect fragment or a form post, with no exchange step and no client authentication. OAuth 2.1 removes them outright. If you're starting something new, authorization code with PKCE covers essentially every case that implicit used to.
+</Callout>
+
+## Authorization Code Flow
+
+This is the flow that matters for the vast majority of applications: anything with a browser and a human in the loop.
+
+<Mermaid caption="OAuth 2.0 authorization code flow">{`sequenceDiagram
+    participant User
+    participant Client
+    participant Auth
+    participant API
+
+    User->>Client: click Login
+    Client->>Auth: redirect to authorize endpoint
+    Auth->>User: show consent screen
+    User->>Auth: approve
+    Auth-->>Client: redirect with code
+    Client->>Auth: exchange code for tokens
+    Auth-->>Client: access_token, refresh_token
+    Client->>API: request with access_token
+    API-->>Client: protected resource`}</Mermaid>
+
+The redirect step matters: the authorization server, not the client, is what actually shows the consent screen and collects credentials. This is the core security property of OAuth — the client application never touches the password, so a compromised or malicious client can't harvest it.
+
+```http
+GET /authorize?response_type=code
+  &client_id=photo-print-app
+  &redirect_uri=https%3A%2F%2Fapp.example.com%2Fcallback
+  &scope=photos.read
+  &state=9f3a1c
+  &code_challenge=E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM
+  &code_challenge_method=S256 HTTP/1.1
+Host: auth.example.com
+```
+
+## Client Credentials Flow
+
+When there's no user in the loop — a backend job syncing data with a partner API, for instance — the client authenticates directly with its own credentials and gets a token scoped to itself rather than to any particular user.
+
+```ts
+async function getServiceToken() {
+  const res = await fetch("https://auth.example.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "client_credentials",
+      client_id: process.env.CLIENT_ID!,
+      client_secret: process.env.CLIENT_SECRET!,
+      scope: "orders.write",
+    }),
+  });
+  return res.json();
+}
+```
+
+This grant type is only appropriate for confidential clients that can protect a secret — a server, not a browser or mobile app.
+
+## Scopes Are Not Permissions
+
+`scope` tells the authorization server what the client is asking for and lets the user consent to a specific, bounded set of capabilities — `photos.read`, not "everything in this account forever." It's easy to conflate scopes with an authorization model, but they aren't one. A scope like `orders.write` doesn't say which orders; the resource server still needs its own logic to decide whether this particular user, with this particular token, can write this particular order. Scopes bound what a token could be used for; they don't replace access control on the resource server.
+
+<Callout type="insight">
+A good mental model: scopes are what the user agreed to when they clicked "Allow." Authorization logic on the resource server is what actually gets enforced. Never assume a token's scope alone proves the request should succeed.
+</Callout>
+
+## OAuth vs OIDC: Where "Login With Google" Fits In
+
+OAuth 2.0 by itself has no concept of "who is this user" — it only hands out access tokens for resources. OpenID Connect (OIDC) is a thin identity layer built on top of OAuth that adds a standardized `id_token` (a JWT) containing claims about the authenticated user, plus a `/userinfo` endpoint. If you've ever implemented "Sign in with Google," you were using OIDC, not bare OAuth, even though the flow looks identical.
+
+<Callout type="note">
+Access token: proves the bearer can call an API. ID token: proves who authenticated. Mixing these up — using an access token to identify a user, or an ID token to call an API — is a common source of subtle bugs.
+</Callout>
+
+## Common Mistakes
+
+- Treating `scope` as if it were a permission system, and skipping authorization checks on the resource server.
+- Storing the `client_secret` in a mobile app or SPA bundle, where it's trivially extractable.
+- Skipping `state` validation, which opens the door to CSRF against the callback endpoint.
+- Requesting broader scopes than the feature actually needs, because it's easier than asking twice.
+- Not rotating refresh tokens on use, so a leaked refresh token stays valid indefinitely.
+
+## Takeaway
+
+OAuth 2.0 delegates authorization, not authentication, by having the client redirect the user to an authorization server, collect consent there, and receive a token in exchange — without the client ever seeing a password. Use the authorization code grant with PKCE for anything with a user present, client credentials for service-to-service calls, treat scopes as a request boundary rather than an access-control system, and layer OpenID Connect on top when you actually need to know who the user is.

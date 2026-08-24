@@ -1,111 +1,489 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&family=Instrument+Serif:ital@0;1&display=swap');
+@import 'tailwindcss';
+@import './tokens.css';
+@import './islands.css';
 
-:root {
-  --bg: #ffffff;
-  --fg: #0a0a0a;
-  --muted: #6b6b6b;
-  --line: rgba(10, 10, 10, 0.12);
-  --surface: rgba(10, 10, 10, 0.03);
-  --max: 1080px;
-  --ease: cubic-bezier(0.16, 1, 0.3, 1);
+/* ============================================================
+   Token → Tailwind bridge. `inline` keeps the var reference in
+   the generated utility, so theme swaps are instant and no
+   utility ever bakes in a literal colour.
+   ============================================================ */
+
+@theme inline {
+  --color-bg-primary: var(--bg-primary);
+  --color-bg-secondary: var(--bg-secondary);
+  --color-surface: var(--surface);
+  --color-surface-hover: var(--surface-hover);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-inset: var(--surface-inset);
+
+  --color-subtle: var(--border-subtle);
+  --color-default: var(--border-default);
+  --color-strong: var(--border-strong);
+
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-inverted: var(--text-inverted);
+
+  --color-blue: var(--accent-blue);
+  --color-purple: var(--accent-purple);
+  --color-cyan: var(--accent-cyan);
+  --color-amber: var(--accent-amber);
+  --color-rose: var(--accent-rose);
+  --color-pillar: var(--pillar);
+  --color-pillar-dim: var(--pillar-dim);
+  --color-pillar-wash: var(--pillar-wash);
+  --color-wash-neutral: var(--wash-neutral);
+
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains), ui-monospace, SFMono-Regular, monospace;
+
+  --ease-out: var(--ease-out);
 }
 
-:root[data-theme='dark'] {
-  --bg: #0a0a0a;
-  --fg: #f5f5f5;
-  --muted: #8f8f8f;
-  --line: rgba(245, 245, 245, 0.14);
-  --surface: rgba(245, 245, 245, 0.04);
-}
+/* ============================================================
+   Base
+   ============================================================ */
 
-*,
-*::before,
-*::after {
-  box-sizing: border-box;
-}
+@layer base {
+  *,
+  *::before,
+  *::after {
+    border-color: var(--border-subtle);
+  }
 
-html {
-  scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-}
+  html {
+    scroll-behavior: smooth;
+    /* Offset anchor jumps so headings clear the sticky header. */
+    scroll-padding-top: calc(var(--header-height) + 1.5rem);
+    -webkit-text-size-adjust: 100%;
+  }
 
-body {
-  margin: 0;
-  background: var(--bg);
-  color: var(--fg);
-  font-family: Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
-  font-size: 16px;
-  line-height: 1.6;
-  transition: background 0.4s var(--ease), color 0.4s var(--ease);
-}
+  body {
+    background-color: var(--bg-primary);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-synthesis-weight: none;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    line-height: 1.6;
+  }
 
-h1, h2, h3, p, ul, figure {
-  margin: 0;
-}
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.2;
+    text-wrap: balance;
+  }
 
-ul {
-  padding: 0;
-  list-style: none;
-}
+  ::selection {
+    background: var(--pillar);
+    color: var(--text-inverted);
+  }
 
-a {
-  color: inherit;
-  text-decoration: none;
-}
+  /* Visible, consistent focus for every interactive element. */
+  :focus-visible {
+    outline: 2px solid var(--pillar);
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+  :focus:not(:focus-visible) {
+    outline: none;
+  }
 
-.serif {
-  font-family: 'Instrument Serif', Georgia, 'Times New Roman', serif;
-  font-weight: 400;
-}
+  /* Scrollbars that match the surface language. */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: var(--border-default);
+    border: 3px solid transparent;
+    background-clip: content-box;
+    border-radius: var(--radius-full);
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+    background-clip: content-box;
+  }
 
-.wrap {
-  width: 100%;
-  max-width: var(--max);
-  margin-inline: auto;
-  padding-inline: 24px;
-}
-
-.section {
-  padding-block: clamp(72px, 12vw, 140px);
-  border-top: 1px solid var(--line);
-}
-
-.eyebrow {
-  font-size: 12px;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--muted);
-  margin-bottom: 28px;
-}
-
-.muted {
-  color: var(--muted);
-}
-
-/* --- scroll reveal --- */
-.reveal {
-  opacity: 0;
-  transform: translateY(24px);
-  transition: opacity 0.8s var(--ease), transform 0.8s var(--ease);
-  transition-delay: var(--delay, 0ms);
-}
-
-.reveal.is-visible {
-  opacity: 1;
-  transform: none;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html { scroll-behavior: auto; }
-  .reveal { opacity: 1; transform: none; transition: none; }
-  *, *::before, *::after {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
+  [hidden] {
+    display: none !important;
   }
 }
 
-::selection {
-  background: var(--fg);
-  color: var(--bg);
+/* ============================================================
+   Reusable primitives
+   ============================================================ */
+
+@layer components {
+  /* Uppercase mono eyebrow — the site's signature metadata style. */
+  .label-mono {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 500;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  /* Card shell: hairline border, pillar-tinted on hover. */
+  .card {
+    position: relative;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    transition:
+      border-color var(--dur-base) var(--ease-out),
+      background-color var(--dur-base) var(--ease-out),
+      transform var(--dur-base) var(--ease-out);
+  }
+
+  .card-interactive:hover {
+    background: var(--surface-hover);
+    border-color: color-mix(in oklab, var(--pillar) 35%, var(--border-default));
+    transform: translateY(-2px);
+  }
+
+  .card-interactive:focus-within {
+    border-color: var(--pillar);
+  }
+
+  /* Schematic corner ticks — the blueprint motif, drawn with
+     gradients so they cost no extra DOM. */
+  .ticked::before,
+  .ticked::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    opacity: 0;
+    transition: opacity var(--dur-base) var(--ease-out);
+    pointer-events: none;
+  }
+  .ticked::before {
+    top: -1px;
+    left: -1px;
+    border-top: 1px solid var(--pillar);
+    border-left: 1px solid var(--pillar);
+    border-top-left-radius: var(--radius-lg);
+  }
+  .ticked::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom: 1px solid var(--pillar);
+    border-right: 1px solid var(--pillar);
+    border-bottom-right-radius: var(--radius-lg);
+  }
+  .ticked:hover::before,
+  .ticked:hover::after,
+  .ticked:focus-within::before,
+  .ticked:focus-within::after {
+    opacity: 1;
+  }
+
+  /* Blueprint grid used sparingly (hero, section dividers). */
+  .grid-backdrop {
+    background-image:
+      linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
+    background-size: 56px 56px;
+  }
+
+  /* Full-bleed hairline that fades at both ends. */
+  .rule-fade {
+    height: 1px;
+    background: linear-gradient(
+      to right,
+      transparent,
+      var(--border-default) 12%,
+      var(--border-default) 88%,
+      transparent
+    );
+  }
+
+  .link-underline {
+    text-decoration: underline;
+    text-decoration-color: color-mix(in oklab, var(--pillar) 45%, transparent);
+    text-underline-offset: 3px;
+    text-decoration-thickness: 1px;
+    transition: text-decoration-color var(--dur-fast) var(--ease-out);
+  }
+  .link-underline:hover {
+    text-decoration-color: var(--pillar);
+  }
+
+  /* Stretched link: the whole card is clickable, but only the
+     title is in the tab order and read as the link. */
+  .link-cover::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+  }
+}
+
+/* ============================================================
+   Article prose. Scoped so MDX authors get good defaults
+   without decorating every element.
+   ============================================================ */
+
+.prose {
+  color: var(--text-secondary);
+  font-size: 1.0625rem;
+  line-height: 1.75;
+}
+
+.prose > * + * {
+  margin-top: 1.25em;
+}
+
+.prose p,
+.prose ul,
+.prose ol {
+  max-width: var(--prose-max);
+}
+
+.prose h2,
+.prose h3,
+.prose h4 {
+  color: var(--text-primary);
+  scroll-margin-top: calc(var(--header-height) + 1.5rem);
+}
+
+.prose h2 {
+  margin-top: 2.75em;
+  font-size: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-subtle);
+}
+
+.prose h3 {
+  margin-top: 2em;
+  font-size: 1.1875rem;
+}
+
+.prose h4 {
+  margin-top: 1.75em;
+  font-size: 1.0625rem;
+}
+
+/* Anchor affordance on headings. */
+.prose :is(h2, h3, h4) > a.heading-anchor {
+  color: var(--text-muted);
+  opacity: 0;
+  margin-left: 0.4em;
+  font-weight: 400;
+  text-decoration: none;
+  transition: opacity var(--dur-fast) var(--ease-out);
+}
+.prose :is(h2, h3, h4):hover > a.heading-anchor,
+.prose a.heading-anchor:focus-visible {
+  opacity: 1;
+}
+
+.prose strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.prose a:not(.heading-anchor) {
+  color: var(--pillar);
+  text-decoration: underline;
+  text-decoration-color: color-mix(in oklab, var(--pillar) 40%, transparent);
+  text-underline-offset: 3px;
+}
+.prose a:not(.heading-anchor):hover {
+  text-decoration-color: var(--pillar);
+}
+
+.prose ul,
+.prose ol {
+  padding-left: 1.35em;
+}
+.prose ul {
+  list-style: none;
+  padding-left: 1.1em;
+}
+.prose ul > li {
+  position: relative;
+}
+.prose ul > li::before {
+  content: '';
+  position: absolute;
+  left: -1.05em;
+  top: 0.72em;
+  width: 5px;
+  height: 5px;
+  border-radius: 1px;
+  background: color-mix(in oklab, var(--pillar) 70%, transparent);
+}
+.prose ol {
+  list-style: decimal;
+}
+.prose ol > li::marker {
+  color: var(--text-muted);
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+}
+.prose li + li {
+  margin-top: 0.5em;
+}
+.prose li > ul,
+.prose li > ol {
+  margin-top: 0.5em;
+}
+
+.prose blockquote {
+  border-left: 2px solid var(--pillar);
+  padding-left: 1.15em;
+  color: var(--text-secondary);
+  font-style: normal;
+}
+
+.prose hr {
+  border: 0;
+  height: 1px;
+  background: var(--border-subtle);
+  margin-block: 2.5em;
+}
+
+/* --- Inline code --- */
+.prose :not(pre) > code {
+  font-family: var(--font-mono);
+  font-size: 0.855em;
+  background: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-sm);
+  padding: 0.12em 0.38em;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+/* --- Code blocks --- */
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.7;
+  background: var(--surface-inset) !important;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1.1rem 1.15rem;
+  overflow-x: auto;
+  tab-size: 2;
+}
+
+.prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* Shiki emits a light-theme variant we swap to under light mode. */
+:root[data-theme='light'] .prose .astro-code,
+:root[data-theme='light'] .prose .astro-code span {
+  color: var(--shiki-light, inherit) !important;
+  background-color: transparent !important;
+}
+
+/* --- Tables --- */
+.prose .table-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+}
+
+.prose table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.9375rem;
+  text-align: left;
+}
+
+.prose thead {
+  background: var(--surface-inset);
+}
+
+.prose th {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  padding: 0.7rem 0.9rem;
+  white-space: nowrap;
+}
+
+.prose td {
+  padding: 0.7rem 0.9rem;
+  border-top: 1px solid var(--border-subtle);
+  vertical-align: top;
+}
+
+.prose tbody tr:hover {
+  background: var(--wash-neutral);
+}
+
+.prose img,
+.prose svg {
+  max-width: 100%;
+  height: auto;
+}
+
+.prose figure figcaption {
+  margin-top: 0.65rem;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* Astro/Mermaid diagrams render as blocks — never let them
+   push the page into horizontal scroll. */
+.prose .mermaid,
+.prose pre.mermaid {
+  background: var(--surface-inset);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+/* ============================================================
+   Motion preferences
+   ============================================================ */
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .card-interactive:hover {
+    transform: none;
+  }
 }

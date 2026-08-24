@@ -1,0 +1,128 @@
+---
+import DifficultyBadge from './DifficultyBadge.astro';
+import ReadingTime from './ReadingTime.astro';
+import TopicBadge from './TopicBadge.astro';
+import type { ContentEntry } from '../../lib/content';
+import { pillars } from '../../data/topics';
+
+interface Props {
+  entry: ContentEntry;
+  /** `compact` drops the description for dense grids. */
+  variant?: 'default' | 'compact';
+  /** Show the pillar name — used on mixed-content grids like search. */
+  showPillar?: boolean;
+  maxTags?: number;
+}
+
+const { entry, variant = 'default', showPillar = false, maxTags = 3 } = Astro.props;
+const pillar = pillars[entry.pillar];
+const tags = entry.tags.slice(0, maxTags);
+const overflow = entry.tags.length - tags.length;
+---
+
+<article class:list={['card card-interactive ticked content-card', `is-${variant}`]}>
+  <div class="card-top">
+    <p class="label-mono card-category">
+      {showPillar ? `${pillar.label} · ${entry.category}` : entry.category}
+    </p>
+    <DifficultyBadge difficulty={entry.difficulty} />
+  </div>
+
+  <h3 class="card-title">
+    <a href={entry.url} class="link-cover">{entry.title}</a>
+  </h3>
+
+  {variant === 'default' && <p class="card-description">{entry.description}</p>}
+
+  <footer class="card-foot">
+    <ul class="card-tags">
+      {
+        tags.map((tag) => (
+          <li>
+            <TopicBadge tag={tag} />
+          </li>
+        ))
+      }
+      {overflow > 0 && <li class="card-overflow">+{overflow}</li>}
+    </ul>
+    <ReadingTime minutes={entry.readingTime} />
+  </footer>
+</article>
+
+<style>
+  .content-card {
+    display: flex;
+    flex-direction: column;
+    gap: 0.6rem;
+    padding: 1rem 1.05rem 0.95rem;
+    height: 100%;
+  }
+
+  .card-top {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+  }
+
+  .card-category {
+    color: var(--pillar);
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.35;
+    color: var(--text-primary);
+    text-wrap: balance;
+  }
+
+  .card-title a {
+    color: inherit;
+    text-decoration: none;
+  }
+
+  .card-description {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    display: -webkit-box;
+    -webkit-line-clamp: 3;
+    line-clamp: 3;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .card-foot {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.75rem;
+    margin-top: auto;
+    padding-top: 0.7rem;
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    min-width: 0;
+  }
+
+  .card-overflow {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    align-self: center;
+  }
+</style>

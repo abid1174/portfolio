@@ -1,0 +1,273 @@
+---
+title: "Designing a URL Shortener"
+description: "Design a URL shortening service like Bitly: encoding schemes, redirect latency, and read-heavy caching at scale."
+type: "system-design"
+category: "Storage"
+tags: ["Storage", "Caching", "Redis", "API Design"]
+difficulty: "beginner"
+readingTime: 18
+publishedAt: "2026-04-10"
+updatedAt: "2026-07-15"
+featured: true
+diagram: "keyvalue"
+scale: "100M new URLs/month, 8K redirects/sec peak"
+related: ["concepts/consistent-hashing", "concepts/database-index", "system-design/rate-limiter"]
+---
+
+A URL shortener looks trivial — map a long URL to a short code, redirect on lookup — and that simplicity is exactly why it's a good interview and design-review subject: the interesting decisions are all in the details of encoding, caching, and read/write ratios, not in inventing new mechanisms.
+
+## Problem
+
+We're building a service where a user submits a long URL and gets back a short one (`sho.rt/aZ9kLp`), and anyone who visits the short URL gets redirected to the original. The two operations have wildly different characteristics: writes (shorten) are rare and can tolerate a few hundred milliseconds; reads (redirect) are extremely frequent, latency-sensitive, and dominate the traffic profile by a couple orders of magnitude. Everything in this design follows from optimizing for that read/write skew.
+
+We also need custom aliases (`sho.rt/my-launch`), expiration, and basic click analytics, since a shortener without click counts is a much less useful product.
+
+## Requirements
+
+**Functional**
+
+- Given a long URL, generate a unique short code and store the mapping.
+- Given a short code, redirect (HTTP 301/302) to the original URL.
+- Support optional custom aliases, chosen by the user, with collision detection.
+- Support optional expiration dates on links.
+- Track click counts and basic metadata (referrer, timestamp) per link.
+
+**Non-functional**
+
+- Redirect latency: p99 under 100ms, since every added millisecond is directly felt by the end user who clicked a link and is waiting on a page load.
+- Read-heavy: expect a 100:1 or higher read-to-write ratio.
+- High availability for redirects — a shortener that's down breaks every link that's ever been shared, including ones in old emails and printed material.
+- Short codes must be unpredictable enough to avoid trivial enumeration of other users' links, but the system is not a security boundary — treat privacy of the destination URL as best-effort, not guaranteed.
+- Eventually consistent click counts are fine; the redirect itself must be strongly consistent (never redirect to a stale or wrong URL).
+
+<Callout type="note">
+We're deliberately not designing for password-protected links or link-level access control here — that's a real feature in production shorteners, but it doesn't change the core system shape, so it's out of scope for this write-up.
+</Callout>
+
+## Capacity Estimation
+
+Assume 100M new short URLs created per month, and a 100:1 read/write ratio for redirects.
+
+- Write QPS (average): 100,000,000 / (30 × 86,400) ≈ 39/s. Even at 5x peak, that's under 200/s — writes are not the bottleneck anywhere in this system.
+- Read QPS (average): 39 × 100 ≈ 3,900/s. At a realistic 2x daily peak factor, redirect traffic peaks around 8,000/s.
+- Storage per record: short code (7 bytes) + long URL (avg 100 bytes) + metadata (user id, created_at, expires_at, click_count) ≈ 150 bytes.
+- New storage per month: 100M × 150 bytes ≈ 15 GB/month.
+- 5-year storage (links tend to outlive their creators' attention but rarely get deleted): 15 GB × 60 months ≈ 900 GB, comfortably under 1 TB even before considering that old, cold links compress and archive well.
+- Short code space: using base62 (`a-z`, `A-Z`, `0-9`), a 7-character code gives `62^7` ≈ 3.5 trillion combinations — enough headroom for decades at this creation rate without ever worrying about exhausting the keyspace.
+
+<Capacity
+  title="Back-of-the-envelope"
+  items={[
+    { label: "New URLs / month", value: "100M", note: "≈ 39 writes/sec avg" },
+    { label: "Redirect QPS (peak)", value: "~8,000/s", note: "100:1 read/write, 2x daily peak" },
+    { label: "Storage / month", value: "~15 GB", note: "150 bytes/record" },
+    { label: "5-year storage", value: "~900 GB", note: "links rarely get deleted" },
+    { label: "Keyspace (7-char base62)", value: "62^7 ≈ 3.5T", note: "no exhaustion risk" }
+  ]}
+/>
+
+## API Design
+
+```http
+POST /v1/urls HTTP/1.1
+Content-Type: application/json
+
+{
+  "longUrl": "https://example.com/blog/2026/how-caching-works-in-practice",
+  "customAlias": "caching-explained",
+  "expiresAt": "2027-08-25T00:00:00Z"
+}
+
+HTTP/1.1 201 Created
+Content-Type: application/json
+
+{
+  "shortCode": "caching-explained",
+  "shortUrl": "https://sho.rt/caching-explained",
+  "longUrl": "https://example.com/blog/2026/how-caching-works-in-practice",
+  "createdAt": "2026-08-25T09:14:02Z",
+  "expiresAt": "2027-08-25T00:00:00Z"
+}
+```
+
+```http
+GET /aZ9kLp HTTP/1.1
+Host: sho.rt
+
+HTTP/1.1 301 Moved Permanently
+Location: https://example.com/blog/2026/how-caching-works-in-practice
+Cache-Control: private, max-age=300
+```
+
+```http
+GET /v1/urls/aZ9kLp/stats HTTP/1.1
+
+HTTP/1.1 200 OK
+Content-Type: application/json
+
+{
+  "shortCode": "aZ9kLp",
+  "totalClicks": 18422,
+  "clicksLast7Days": 934,
+  "topReferrers": ["twitter.com", "direct", "newsletter"]
+}
+```
+
+The redirect endpoint is intentionally the leanest possible request — no auth, no body, a single path segment lookup — because it's the endpoint that runs 8,000 times a second at peak and every extra parsing step costs latency budget across that entire volume.
+
+## Data Model
+
+```sql
+CREATE TABLE urls (
+  short_code   VARCHAR(16)  PRIMARY KEY,
+  long_url     TEXT         NOT NULL,
+  user_id      BIGINT,
+  created_at   TIMESTAMPTZ  NOT NULL DEFAULT now(),
+  expires_at   TIMESTAMPTZ,
+  is_custom    BOOLEAN      NOT NULL DEFAULT false
+);
+
+CREATE TABLE click_events (
+  id          BIGINT PRIMARY KEY,
+  short_code  VARCHAR(16) NOT NULL,
+  clicked_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  referrer    VARCHAR(255),
+  user_agent  VARCHAR(255),
+  ip_hash     VARCHAR(64)
+) PARTITION BY RANGE (clicked_at);
+
+CREATE INDEX idx_urls_user ON urls (user_id, created_at DESC);
+CREATE INDEX idx_clicks_code_time ON click_events (short_code, clicked_at DESC);
+```
+
+`urls` is small (150 bytes/row, ~900GB over 5 years) and fits comfortably in a key-value store or a sharded relational table keyed by `short_code`. `click_events` is the high-volume table — one row per redirect, so it inherits the same 8,000 writes/sec profile as the redirect path — and is partitioned by time so old partitions can be rolled up into daily aggregates and dropped, keeping the hot partition small.
+
+| Table | Row count (5yr) | Access pattern |
+|---|---|---|
+| `urls` | ~6B | Point lookup by `short_code`, extremely read-heavy |
+| `click_events` | tens of billions | Write-heavy append, read via aggregation only |
+
+## High-Level Architecture
+
+<Mermaid caption="High-level architecture">{`flowchart LR
+    C[Client] --> LB[Load Balancer]
+    LB --> APP[Redirect Service]
+    APP --> CACHE[Redis Cache]
+    CACHE --> DB[URL Store]
+    APP --> Q[Click Event Queue]
+    Q --> AGG[Click Aggregator]
+    AGG --> ANALYTICS[Analytics Store]
+    W[Write API] --> DB
+    W --> ENC[Code Generator]`}</Mermaid>
+
+The redirect path is cache-first: every redirect service instance checks Redis before touching the database, and cache hit rate is the single most important number in this system because it directly determines both p99 latency and database load. The write path is entirely separate and low-volume, going straight to the primary store with no caching layer needed.
+
+## Deep Dive
+
+### Generating short codes
+
+Two viable approaches, and the choice matters more than it looks:
+
+**Hash-based**: MD5 or SHA-256 the long URL, base62-encode the first 7 characters of the hash. Simple, deterministic (same input always produces the same code, which is arguably a feature), but collisions are inevitable at scale — birthday-paradox math on a 7-character truncated hash gives a meaningfully non-zero collision rate at billions of URLs, so every write needs a collision-check-and-retry loop against the database.
+
+**Counter-based**: maintain a globally unique, monotonically increasing id (via a dedicated id-generation service, or Snowflake-style worker-id + timestamp + sequence), then base62-encode that id directly into a short code. No collisions by construction — the id space and the code space are in bijection. The cost is operating an id generator that itself needs to be highly available and non-blocking.
+
+<Decision title="Counter-based generation over hashing" choice="Snowflake-style distributed id generator, base62-encoded">
+Hash-based collision handling adds a retry loop to every single write and gets worse as the table fills up — exactly the wrong direction for a system that's supposed to get simpler to reason about over time, not more failure-prone. A distributed counter (64-bit: timestamp + worker id + sequence) gives collision-free codes with predictable latency, at the cost of running one more small stateful service. Given writes are only ~40/s average, the id generator is never the bottleneck.
+</Decision>
+
+Base62-encoding a 64-bit id produces up to 11 characters, longer than we want for a "short" URL. We truncate the generator's sequence space so ids fit in 7 base62 characters for the first several years of operation (about 3.5 trillion values, see Capacity Estimation), then widen to 8 characters — a one-time, foreseeable migration rather than an emergency one.
+
+### Custom aliases and collision handling
+
+Custom aliases skip the generator entirely — the user's requested string is the key. The write path does an existence check (`SELECT 1 FROM urls WHERE short_code = ?`) before insert, and because two concurrent requests could both pass that check for the same alias, the actual guarantee comes from a unique constraint on `short_code` at the database level; the app-level check is purely to return a fast, friendly "alias taken" error instead of surfacing a raw constraint violation.
+
+### Cache strategy
+
+Redis holds `short_code → long_url` with a TTL, sized to keep the working set (recently created and recently popular links — this follows a strong power-law distribution, a small fraction of links account for most redirects) in memory. On a cache miss, the redirect service reads through to the database and populates the cache before responding. We use cache-aside rather than write-through because writes are rare enough that pre-warming the cache on every write buys nothing, and we'd rather keep the write path simple.
+
+<Callout type="tip">
+Set a short TTL (minutes, not hours) even though `long_url` almost never changes after creation. The TTL isn't there for correctness — it's there so a link that suddenly goes viral doesn't permanently occupy cache memory it no longer needs once traffic fades, and so an expired or deleted link's stale mapping ages out on its own instead of needing an active eviction on delete.
+</Callout>
+
+### Redirect status code: 301 vs 302
+
+301 (permanent) lets browsers cache the redirect locally, which reduces load on our service for repeat visits — but it also means we lose visibility into every subsequent click, since the browser never asks us again. 302 (temporary, or 307 to preserve semantics) costs us more request volume but keeps click analytics accurate. We default to 302 for regular links so click counts stay meaningful, and offer 301 as an opt-in for users who explicitly say they don't need analytics and want the caching benefit — this is a product trade-off dressed as an HTTP status code choice, not a technical one.
+
+### Click tracking without blocking the redirect
+
+The redirect response should never wait on writing an analytics row. The redirect service fires the `Location` header response immediately and asynchronously pushes a click event onto a lightweight queue (or even just an in-memory buffer flushed periodically) that a separate aggregator consumes to update `click_events` and rollup counters. This decouples redirect latency from analytics write throughput entirely.
+
+## Failure Handling
+
+| Failure | Detection | Response |
+|---|---|---|
+| Cache node down | Connection errors from Redis client | Read through to database directly; degraded latency, not degraded correctness |
+| Database primary down | Health check / replication lag alert | Promote a read replica; short window of write unavailability, reads continue from replica |
+| Id generator unavailable | Timeout on next-id call | Write API returns 503 for new shortens; existing redirects are entirely unaffected since they don't call the generator |
+| Click event queue backs up | Queue depth alert | Drop oldest events past a buffer threshold — approximate click counts are an acceptable degradation, lost redirects are not |
+| Malicious/spam URL submitted | Async URL-safety scan flags it | Link is disabled (redirect returns 410 Gone) after the fact; we don't block synchronously on a safety-check API during creation, since that would put an external dependency in the write path's latency budget |
+
+<Callout type="warning" title="Never let analytics durability requirements leak into the redirect path">
+The single most common design mistake in a URL shortener is writing the click event synchronously before issuing the redirect. It couples the most latency-critical path in the system to the durability guarantees of an analytics pipeline that doesn't need them. Keep them decoupled from day one — retrofitting this split under load is painful.
+</Callout>
+
+## Scaling
+
+### Read scaling
+
+The `urls` table is sharded by `short_code` (hash-based sharding works well since codes are already effectively random) across multiple database instances, each fronted by its own Redis cache tier. Because the access pattern is always a point lookup by a known key — never a range scan or a join — this shards cleanly with no cross-shard query complexity.
+
+### Cache tier scaling
+
+As redirect QPS grows, add Redis replicas and shard the cache the same way as the database (consistent hashing on `short_code` keeps cache and database shard boundaries aligned, so a request only ever needs to know one shard's address). At 8,000 QPS peak with a healthy cache hit rate (targeting 95%+, since link popularity is heavily skewed), a single well-sized Redis cluster handles this without strain; this becomes a multi-cluster geo-distributed problem only past roughly 50-100K QPS or when latency to a single region's cache becomes the bottleneck for a global user base.
+
+### CDN edge redirects
+
+For a mature deployment, the most effective scaling move is pushing the redirect itself to the edge: a CDN or edge-compute layer (Cloudflare Workers, Lambda@Edge) holds the hot subset of the cache and serves redirects without a round trip to origin at all. This turns "scale the redirect service" into "scale the edge cache," which is a problem CDN providers have already solved.
+
+### Write scaling
+
+Writes stay low-volume (tens per second) essentially forever relative to redirect traffic, so the id generator and write path rarely need horizontal scaling — the effort is better spent making sure the generator itself doesn't become a single point of failure (run several instances with non-overlapping worker-id ranges) rather than making it faster.
+
+<Tradeoff
+  optionA="Hash-based short code (MD5/SHA truncated)"
+  optionB="Counter-based short code (distributed id generator)"
+  a={["No extra service to run", "Collision-check-and-retry loop needed on every write", "Collision rate worsens as the table fills"]}
+  b={["Zero collisions by construction, predictable write latency", "One more small stateful service to operate", "Straightforward to reason about and audit"]}
+  recommendation="Counter-based generation for anything expecting sustained growth past a few hundred million URLs — the operational cost of one small id service is lower than the long-tail cost of a growing collision rate."
+/>
+
+## Observability
+
+- **Cache hit rate on the redirect path** is the leading indicator for everything else — a drop here predicts a database load spike and a latency regression before either shows up in their own dashboards.
+- **Redirect p50/p99 latency**, broken out by cache hit vs. miss, so a latency regression can be immediately attributed to "cache is missing more" versus "database got slower."
+- **Write error rate on custom alias collisions** — a spike here can indicate either organic popular-name contention or an automated scraping/squatting attempt.
+- **Click event queue lag**, since it's the one place we've deliberately accepted eventual consistency, and lag growing unbounded means the aggregator is falling behind and analytics are becoming stale.
+
+Every redirect response includes a lightweight internal trace header (sampled, not on every request) recording cache hit/miss and shard id, which turns "why was this one redirect slow" from a log-grepping exercise into a single trace lookup.
+
+## Trade-offs
+
+The core trade-off in this design is **redirect status code and its second-order effect on both caching and analytics accuracy** — 301 gives browsers a free caching win at the direct cost of losing visibility into repeat clicks, and there's no way to have both without giving something else up (short-TTL 301s recover some analytics accuracy but add complexity for marginal benefit). We chose 302-by-default because a shortener without trustworthy click counts loses a feature most users actually care about, and accepted the extra request volume that comes with it, since our cache-and-shard architecture is already sized to absorb it.
+
+The second trade-off is counter-based over hash-based code generation, covered in the Deep Dive — we're trading a small amount of operational surface area (running an id generator) for the elimination of an entire class of write-path failure (collisions) that gets systematically worse over the service's lifetime rather than better.
+
+## Final Architecture
+
+<Mermaid caption="Final architecture with sharded cache and async analytics">{`flowchart TD
+    C[Client] --> EDGE[Edge Cache]
+    EDGE --> LB[Load Balancer]
+    LB --> APP[Redirect Service]
+    APP --> SHARD1[Cache Shard A]
+    APP --> SHARD2[Cache Shard B]
+    SHARD1 --> DB1[DB Shard A]
+    SHARD2 --> DB2[DB Shard B]
+    APP --> QUEUE[Click Event Buffer]
+    QUEUE --> AGG[Click Aggregator]
+    AGG --> ANALYTICS[Analytics Store]
+    WRITE[Write API] --> IDGEN[Id Generator]
+    WRITE --> DB1
+    WRITE --> DB2`}</Mermaid>
+
+The finished system keeps the redirect path — the one that runs thousands of times a second — as short and cache-heavy as possible, with sharding aligned between cache and storage so every lookup touches exactly one shard. Writes are isolated on a separate, low-volume path fed by a collision-free id generator, and click analytics are decoupled entirely so their durability requirements never leak into redirect latency.

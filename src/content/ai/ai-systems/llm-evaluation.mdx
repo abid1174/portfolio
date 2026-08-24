@@ -1,0 +1,109 @@
+---
+title: "LLM Evaluation"
+description: "Building eval sets, choosing between deterministic checks and model graders, and catching regressions before a prompt change ships."
+type: "ai"
+category: "Evaluation"
+tags: ["Evaluation", "LLM", "Observability", "Reliability"]
+difficulty: "advanced"
+readingTime: 14
+publishedAt: "2026-08-10"
+updatedAt: "2026-08-22"
+featured: false
+related: ["ai/rag", "ai/ai-agents", "ai/prompt-engineering"]
+---
+
+"It looks better in my testing" is not an evaluation strategy, and it's exactly how prompt and model changes quietly regress production quality. LLM evaluation is the discipline of turning "seems good" into a number you can track across changes — the same instinct that made unit tests non-negotiable for regular code, applied to a component whose output is nondeterministic by design.
+
+## Why "It Seems to Work" Isn't an Eval
+
+Manually reading transcripts catches obvious failures and misses everything subtle — a retrieval system that answers 90% of common questions well and silently fails on a long tail you never happened to try. Worse, it doesn't survive a change: without a fixed, repeatable set of inputs and a scoring method, there's no way to say whether a new prompt or a new model version made things better or worse, only whether it feels different on the handful of examples you happened to glance at.
+
+<Callout type="note">
+An eval is three things: a fixed set of inputs, a way to score the output for each one, and a way to run that scoring automatically and repeatably. Missing any one of the three means you're back to reading transcripts by hand.
+</Callout>
+
+## Building an Eval Set
+
+A good eval set is built from real failure cases, not invented ones. Start by logging production traffic (with appropriate privacy handling), and pull the cases where users complained, retried their query, or gave negative feedback — those are exactly the inputs your current system handles badly, which makes them the highest-value additions to the eval set. Supplement with synthetic edge cases for scenarios you know matter but haven't seen enough real examples of yet.
+
+```python
+eval_cases = [
+    {
+        "id": "billing-double-charge-001",
+        "input": "My invoice shows twice the usual amount, what happened?",
+        "expected_category": "billing",
+        "expected_facts": ["reset window", "60-second"],
+    },
+    {
+        "id": "ambiguous-002",
+        "input": "it's not working",
+        "expected_category": "bug",
+        "expected_behavior": "ask_clarifying_question",
+    },
+]
+```
+
+<Callout type="tip">
+Weight your eval set toward the hard cases, not the easy majority. A set that's 90% straightforward queries will show near-perfect scores that don't move when you make a real improvement, because the easy cases were already passing.
+</Callout>
+
+## Deterministic Checks vs Model Graders
+
+Not every output needs a model to grade it. Structural properties — is the output valid JSON, does it match a required schema, is a required field present, does a numeric answer fall within a tolerance — should be checked with plain code. It's faster, free, perfectly reproducible, and has zero risk of the grader itself being wrong in a way that's hard to detect.
+
+| Check type | Use for | Cost |
+|---|---|---|
+| Exact match / regex | Structured fields, classification labels | Free, instant |
+| Schema validation | JSON output shape | Free, instant |
+| Deterministic function | Numeric tolerance, business rule checks | Free, instant |
+| Embedding similarity | Loose semantic match to a reference answer | Cheap, fast |
+| LLM-as-judge | Open-ended quality, faithfulness, tone | Slower, costs tokens, needs its own validation |
+
+Reach for a model grader only once deterministic checks run out — for genuinely open-ended qualities like "is this answer faithful to the retrieved context" or "does this response match our support tone," where there's no fixed string to match against.
+
+## LLM-as-Judge
+
+Using a model to grade another model's output works, but it inherits the same reliability concerns as any other LLM call — it needs a clear rubric, and it needs its own accuracy checked against human judgment before you trust it. A vague grading prompt ("is this a good answer?") produces inconsistent scores; a specific rubric with concrete pass/fail criteria produces something closer to a reliable metric.
+
+<PromptExample
+  model="claude-sonnet-5"
+  prompt={`You are grading whether an AI support response is faithful to its source context.
+Respond with JSON: {"faithful": true|false, "reason": "..."}
+
+Source context:
+"""
+Refunds are processed within 5-7 business days after approval.
+"""
+
+AI response: "Your refund will be processed within 5-7 business days once approved."`}
+  output={`{"faithful": true, "reason": "The response accurately restates the timeline and condition from the source context without adding unsupported claims."}`}
+/>
+
+<Callout type="warning">
+Validate the judge itself against a small set of human-labeled examples before trusting its scores at scale. A judge model that agrees with human graders 70% of the time is producing a metric with real noise in it — know that error rate before you use the metric to gate a release.
+</Callout>
+
+## Regression Testing Prompts
+
+Treat prompt and model changes the way you'd treat a code change: run the full eval suite before merging, not after noticing a problem in production. A prompt change that improves the three examples you tested it against can regress a dozen cases you didn't think to check — that's exactly what a fixed eval set catches and ad hoc testing doesn't.
+
+```bash
+# Run the eval suite against a candidate prompt version, diff against baseline
+python run_evals.py --prompt-version candidate --baseline main --output results.json
+```
+
+Track scores over time, per category, not just as one aggregate number. An aggregate score can stay flat while a specific category — say, ambiguous queries — quietly gets worse, masked by improvement elsewhere in the set.
+
+Statistical noise is easy to underestimate here. Sampling temperature and inherent model variance mean the same prompt against the same eval case can score differently across runs, so a single run's pass rate is a noisy estimate, not a fact. Run the suite multiple times per candidate, or run at low sampling variance for the eval specifically, before treating a small score delta between two prompt versions as a real improvement rather than noise.
+
+## Evaluating Agents and Multi-Step Systems
+
+Agents need evaluation at two levels: the final outcome (did the task actually get completed correctly) and the trajectory (were the intermediate steps reasonable, or did the agent get the right answer through an unreliable path that will fail differently next time). A trajectory eval checks things like: did it call the right tools, in a sensible order, without redundant calls, and did it recover reasonably when a tool returned an error.
+
+<Callout type="insight" title="Outcome-only evaluation hides fragility">
+An agent that reaches the correct answer by retrying a failing tool call five times looks identical to a robust agent if you only score the final outcome. Trajectory-level checks are what catch that the underlying behavior is fragile before it shows up as a cost or latency incident in production.
+</Callout>
+
+## Takeaway
+
+Evaluation is what turns prompt and model changes from a guess into a measured decision. Build the eval set from real failures, use deterministic checks wherever the output has a checkable structure, reserve model graders for genuinely open-ended judgments, and validate those graders against human labels before trusting the numbers they produce.
