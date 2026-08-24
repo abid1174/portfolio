@@ -3,6 +3,9 @@
   "type": "module",
   "version": "0.0.1",
   "private": true,
+  "engines": {
+    "node": ">=22.12.0"
+  },
   "scripts": {
     "dev": "astro dev",
     "build": "astro build",
@@ -47,5 +50,10 @@
     "esbuild@0.28.2": true,
     "fsevents@2.3.3": true
   },
-  "description": "Personal engineering knowledge portfolio — concepts, system design and AI notes."
+  "description": "Personal engineering knowledge portfolio \u2014 concepts, system design and AI notes.",
+  "overrides": {
+    "eslint-plugin-jsx-a11y": {
+      "eslint": "$eslint"
+    }
+  }
 }
