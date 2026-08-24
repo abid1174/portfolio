@@ -1,0 +1,39 @@
+---
+import Base from '../layouts/Base.astro';
+import Nav from '../components/Nav';
+import Hero from '../components/Hero';
+import Marquee from '../components/Marquee.astro';
+import Work from '../components/Work';
+import About from '../components/About';
+import Contact from '../components/Contact';
+import { site } from '../lib/site';
+
+const year = new Date().getFullYear();
+---
+
+<Base title={`${site.name} — ${site.role}`} description={site.intro}>
+  <Nav client:load name={site.name} />
+
+  <main>
+    <Hero
+      client:load
+      name={site.name}
+      role={site.role}
+      intro={site.intro}
+      location={site.location}
+    />
+
+    <Marquee items={site.skills} />
+
+    <Work client:visible projects={site.projects} />
+    <About client:visible paragraphs={site.about} skills={site.skills} />
+    <Contact client:visible email={site.email} links={site.links} />
+  </main>
+
+  <footer class="footer">
+    <div class="wrap footer__inner">
+      <span>© {year} {site.name}</span>
+      <span>Built with Astro &amp; React</span>
+    </div>
+  </footer>
+</Base>

@@ -1,0 +1,27 @@
+{
+  "name": "portfolio",
+  "type": "module",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "astro dev",
+    "build": "astro build",
+    "preview": "astro preview",
+    "check": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@astrojs/react": "^6.0.4",
+    "astro": "^7.2.4",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true,
+    "fsevents@2.3.3": true
+  }
+}
