@@ -1,0 +1,16 @@
+---
+import type { MarkdownHeading } from 'astro';
+import ArticleLayout from './ArticleLayout.astro';
+import type { ContentEntry } from '../lib/content';
+
+interface Props {
+  entry: ContentEntry;
+  headings: MarkdownHeading[];
+}
+
+const { entry, headings } = Astro.props;
+---
+
+<ArticleLayout entry={entry} headings={headings}>
+  <slot />
+</ArticleLayout>

@@ -1,0 +1,153 @@
+---
+import { CornerDownRight, Terminal } from 'lucide-react';
+import CopyButton from '../react/CopyButton';
+
+interface Props {
+  prompt: string;
+  output?: string;
+  model?: string;
+  label?: string;
+}
+
+const { prompt, output, model, label = 'Prompt' } = Astro.props;
+---
+
+<figure class="prompt">
+  <figcaption class="prompt-head">
+    <span class="prompt-title">
+      <Terminal size={13} strokeWidth={2} aria-hidden="true" />
+      {label}
+    </span>
+    <span class="prompt-actions">
+      {model && <code class="prompt-model">{model}</code>}
+      <CopyButton client:visible value={prompt} label="prompt" />
+    </span>
+  </figcaption>
+
+  <pre class="prompt-body"><code>{prompt}</code></pre>
+
+  {
+    output && (
+      <>
+        <p class="prompt-divider">
+          <CornerDownRight size={12} strokeWidth={2} aria-hidden="true" />
+          <span>Output</span>
+        </p>
+        <pre class="prompt-output">
+          <code>{output}</code>
+        </pre>
+      </>
+    )
+  }
+</figure>
+
+<style>
+  .prompt {
+    margin-block: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .prompt-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    padding: 0.5rem 0.7rem 0.5rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+  }
+
+  .prompt-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .prompt-title :global(svg) {
+    color: var(--accent-cyan);
+  }
+
+  .prompt-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+
+  .prompt-model {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--accent-cyan);
+    background: var(--wash-cyan);
+    border-radius: var(--radius-sm);
+    padding: 0.15rem 0.4rem;
+    white-space: nowrap;
+  }
+
+  .prompt-body,
+  .prompt-output {
+    margin: 0;
+    padding: 0.95rem 1.1rem;
+    background: transparent;
+    border: 0;
+    border-radius: 0;
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    line-height: 1.65;
+    color: var(--text-secondary);
+    white-space: pre-wrap;
+    word-break: break-word;
+    overflow-x: auto;
+  }
+
+  .prompt-output {
+    background: var(--surface-inset);
+    color: var(--text-primary);
+  }
+
+  .prompt-divider {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0.4rem 1rem;
+    border-block: 1px solid var(--border-subtle);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    max-width: none;
+  }
+</style>
+
+<style is:global>
+  .copy-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    padding: 0.2rem 0.45rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-sm);
+    background: var(--surface);
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    cursor: pointer;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+  .copy-btn:hover {
+    color: var(--text-primary);
+    border-color: var(--border-strong);
+  }
+</style>

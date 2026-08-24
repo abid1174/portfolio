@@ -1,0 +1,90 @@
+---
+import MermaidDiagram from '../react/MermaidDiagram';
+
+interface Props {
+  /** Diagram source. Passed as a child in MDX or as this prop. */
+  chart?: string;
+  caption?: string;
+}
+
+const { chart, caption } = Astro.props;
+
+/**
+ * Slot content arrives HTML-escaped, which would corrupt Mermaid's
+ * `-->` edges and bracket labels. Decode before handing it over.
+ */
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&amp;/g, '&');
+}
+
+// MDX passes the diagram source as a child; support both shapes.
+const raw = chart ?? (await Astro.slots.render('default'));
+const source = decodeEntities(raw).trim();
+
+// Stable per-render id — Mermaid requires a unique DOM id per diagram.
+const id = `mermaid-${Math.random().toString(36).slice(2, 9)}`;
+---
+
+<figure class="diagram">
+  <div class="diagram-frame">
+    <MermaidDiagram client:visible chart={source} id={id} />
+  </div>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .diagram {
+    margin-block: 2rem;
+  }
+
+  .diagram-frame {
+    padding: 1.25rem 1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background:
+      radial-gradient(60% 70% at 50% 0%, var(--pillar-wash), transparent 70%), var(--surface);
+    overflow-x: auto;
+  }
+
+  figcaption {
+    margin-top: 0.65rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+  }
+</style>
+
+<style is:global>
+  .mermaid-canvas {
+    display: flex;
+    justify-content: center;
+    min-height: 4rem;
+  }
+  .mermaid-canvas[data-status='loading'] {
+    opacity: 0;
+  }
+  .mermaid-canvas[data-status='ready'] {
+    opacity: 1;
+    transition: opacity var(--dur-slow) var(--ease-out);
+  }
+  .mermaid-canvas svg {
+    max-width: 100%;
+    height: auto;
+  }
+  .mermaid-fallback {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    white-space: pre-wrap;
+  }
+</style>

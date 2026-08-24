@@ -1,0 +1,179 @@
+---
+/**
+ * The hero's technical motif: the site's own information architecture
+ * drawn as a schematic — one root splitting into the three pillars,
+ * each feeding a cluster of notes. Pure SVG, no runtime cost.
+ */
+---
+
+<div class="visual" aria-hidden="true">
+  <svg viewBox="0 0 340 300" fill="none" preserveAspectRatio="xMidYMid meet">
+    <defs>
+      <linearGradient id="hv-blue" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="var(--accent-blue)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-blue)" stop-opacity="0.25"></stop>
+      </linearGradient>
+      <linearGradient id="hv-purple" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="var(--accent-purple)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-purple)" stop-opacity="0.25"></stop>
+      </linearGradient>
+      <linearGradient id="hv-cyan" x1="0" y1="0" x2="1" y2="1">
+        <stop offset="0%" stop-color="var(--accent-cyan)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-cyan)" stop-opacity="0.25"></stop>
+      </linearGradient>
+    </defs>
+
+    <!-- Trunk: root node down to the split -->
+    <path class="wire" d="M170 34v34"></path>
+    <!-- Branches out to the three pillars -->
+    <path class="wire" d="M170 68C170 90 62 84 62 112"></path>
+    <path class="wire" d="M170 68v44"></path>
+    <path class="wire" d="M170 68C170 90 278 84 278 112"></path>
+
+    <!-- Pillar stems down to their note clusters -->
+    <path class="wire" d="M62 146v30"></path>
+    <path class="wire" d="M170 146v30"></path>
+    <path class="wire" d="M278 146v30"></path>
+
+    <!-- Note clusters -->
+    <g class="cluster">
+      <path class="wire thin" d="M62 176c0 12-20 10-20 22M62 176v22M62 176c0 12 20 10 20 22"
+      ></path>
+      <path class="wire thin" d="M170 176c0 12-20 10-20 22M170 176v22M170 176c0 12 20 10 20 22"
+      ></path>
+      <path class="wire thin" d="M278 176c0 12-20 10-20 22M278 176v22M278 176c0 12 20 10 20 22"
+      ></path>
+    </g>
+
+    <!-- Root -->
+    <rect class="chip root" x="128" y="14" width="84" height="22" rx="6"></rect>
+    <text class="chip-label" x="170" y="29" text-anchor="middle">knowledge</text>
+
+    <!-- Pillars -->
+    <rect class="chip" x="20" y="112" width="84" height="34" rx="8" stroke="url(#hv-blue)"
+    ></rect>
+    <text class="chip-label strong" x="62" y="128" text-anchor="middle">concepts</text>
+    <text class="chip-sub" x="62" y="140" text-anchor="middle">fundamentals</text>
+
+    <rect class="chip" x="128" y="112" width="84" height="34" rx="8" stroke="url(#hv-purple)"
+    ></rect>
+    <text class="chip-label strong" x="170" y="128" text-anchor="middle">systems</text>
+    <text class="chip-sub" x="170" y="140" text-anchor="middle">trade-offs</text>
+
+    <rect class="chip" x="236" y="112" width="84" height="34" rx="8" stroke="url(#hv-cyan)"
+    ></rect>
+    <text class="chip-label strong" x="278" y="128" text-anchor="middle">ai</text>
+    <text class="chip-sub" x="278" y="140" text-anchor="middle">mechanics</text>
+
+    <!-- Leaf notes -->
+    <g class="leaves">
+      <circle class="leaf blue" cx="42" cy="202" r="4"></circle>
+      <circle class="leaf blue" cx="62" cy="202" r="4"></circle>
+      <circle class="leaf blue" cx="82" cy="202" r="4"></circle>
+      <circle class="leaf purple" cx="150" cy="202" r="4"></circle>
+      <circle class="leaf purple" cx="170" cy="202" r="4"></circle>
+      <circle class="leaf purple" cx="190" cy="202" r="4"></circle>
+      <circle class="leaf cyan" cx="258" cy="202" r="4"></circle>
+      <circle class="leaf cyan" cx="278" cy="202" r="4"></circle>
+      <circle class="leaf cyan" cx="298" cy="202" r="4"></circle>
+    </g>
+
+    <!-- Convergence back into the reader -->
+    <path class="wire thin" d="M62 210c0 26 108 14 108 42M170 210v42M278 210c0 26-108 14-108 42"
+    ></path>
+    <rect class="chip out" x="122" y="252" width="96" height="24" rx="7"></rect>
+    <text class="chip-label" x="170" y="268" text-anchor="middle">understanding</text>
+  </svg>
+</div>
+
+<style>
+  .visual {
+    position: relative;
+    width: 100%;
+    max-width: 22rem;
+    margin-inline: auto;
+  }
+
+  .visual::before {
+    content: '';
+    position: absolute;
+    inset: 12% 8%;
+    background: radial-gradient(
+      50% 50% at 50% 50%,
+      color-mix(in oklab, var(--accent-blue) 18%, transparent),
+      transparent 72%
+    );
+    filter: blur(28px);
+    pointer-events: none;
+  }
+
+  svg {
+    position: relative;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .wire {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    fill: none;
+  }
+
+  .wire.thin {
+    stroke-width: 0.75;
+    opacity: 0.55;
+  }
+
+  .chip {
+    fill: var(--surface-raised);
+    stroke: var(--border-strong);
+    stroke-width: 1;
+  }
+
+  .chip.root,
+  .chip.out {
+    fill: var(--surface-inset);
+    stroke: var(--border-default);
+  }
+
+  .chip-label {
+    font-family: var(--font-jetbrains), ui-monospace, monospace;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    fill: var(--text-muted);
+  }
+
+  .chip-label.strong {
+    fill: var(--text-primary);
+    font-size: 10px;
+    font-weight: 600;
+  }
+
+  .chip-sub {
+    font-family: var(--font-jetbrains), ui-monospace, monospace;
+    font-size: 7.5px;
+    letter-spacing: 0.08em;
+    fill: var(--text-muted);
+  }
+
+  .leaf.blue {
+    fill: var(--accent-blue);
+  }
+  .leaf.purple {
+    fill: var(--accent-purple);
+  }
+  .leaf.cyan {
+    fill: var(--accent-cyan);
+  }
+  .leaf {
+    opacity: 0.85;
+  }
+
+  @media (max-width: 60rem) {
+    .visual {
+      max-width: 17rem;
+    }
+  }
+</style>

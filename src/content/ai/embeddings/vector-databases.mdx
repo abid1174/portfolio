@@ -1,0 +1,100 @@
+---
+title: "Vector Databases Explained"
+description: "Why nearest-neighbor search needs its own index structure, how HNSW works, and what actually differs between vector database options."
+type: "ai"
+category: "Embeddings"
+tags: ["Vector Databases", "Embeddings", "Databases", "Performance"]
+difficulty: "intermediate"
+readingTime: 12
+publishedAt: "2026-06-02"
+updatedAt: "2026-06-18"
+featured: false
+related: ["ai/embeddings", "ai/rag", "concepts/database-index", "concepts/consistent-hashing"]
+---
+
+A vector database's one job is answering "which of these million vectors are closest to this query vector" fast enough to sit in the critical path of a user request. A regular B-tree index can't do that, because there's no meaningful sort order over high-dimensional points — this is a fundamentally different search problem from the ones relational indexes solve.
+
+## Why Vector Search Needs Its Own Index
+
+A B-tree index works because keys have a total order: given any two keys, one is less than the other, and the tree can discard whole subtrees during a lookup. Vectors in a few hundred dimensions have no such order — "closer to the query" is a geometric relationship, not a comparison you can sort by. Computing exact nearest neighbors means comparing the query against every vector in the collection, an O(n) scan that gets unusable past a few tens of thousands of vectors at query latencies people will tolerate.
+
+<Callout type="note">
+Brute-force search is still the right choice for small collections. Below roughly 10,000-50,000 vectors, scanning everything with a vectorized dot product is often faster in wall-clock terms than the overhead of building and querying an approximate index. Don't reach for a vector database before you've measured that brute force is actually too slow.
+</Callout>
+
+## Approximate Nearest Neighbor Search
+
+Every production vector database trades exactness for speed via approximate nearest neighbor (ANN) search. Instead of guaranteeing the true top-k closest vectors, it guarantees a high probability of finding vectors very close to the true top-k, in exchange for sublinear query time. The two dominant index families are graph-based (HNSW) and quantization-based (IVF, product quantization), and most databases combine both.
+
+<Mermaid caption="Query path through an ANN index">{`flowchart TD
+    Q[Query Vector] --> N[Enter Graph at Top Layer]
+    N --> S[Greedy Search Toward Closer Nodes]
+    S --> D[Descend to Denser Layer]
+    D --> S
+    D --> C[Candidate Set]
+    C --> F[Exact Rerank of Candidates]
+    F --> K[Top K Results]`}</Mermaid>
+
+## HNSW in Practice
+
+Hierarchical Navigable Small World (HNSW) graphs build a multi-layer structure where the top layer has few nodes and long-range links, and each lower layer gets progressively denser. A query starts at the sparse top layer, greedily walks toward the closest node it can find, then drops down a layer and repeats — narrowing in on the true neighborhood in roughly logarithmic steps instead of a linear scan.
+
+Two parameters dominate the recall-versus-speed tradeoff:
+
+| Parameter | Effect of increasing it | Cost |
+|---|---|---|
+| `M` (max connections per node) | Higher recall, better graph connectivity | More memory, slower inserts |
+| `ef_search` (candidates explored at query time) | Higher recall, closer to exact results | Higher query latency |
+
+```python
+import hnswlib
+
+index = hnswlib.Index(space="cosine", dim=1536)
+index.init_index(max_elements=1_000_000, ef_construction=200, M=16)
+index.add_items(vectors, ids)
+index.set_ef(64)  # ef_search — tune per query workload
+
+labels, distances = index.knn_query(query_vector, k=10)
+```
+
+<Callout type="tip">
+Tune `ef_search` against a labeled eval set, not by feel. Push it up until recall stops improving meaningfully, then back off slightly for latency headroom — the recall curve is steep at first and flattens quickly, so the useful range is usually narrower than people expect.
+</Callout>
+
+Quantization-based indexes take a different approach to the same problem. Inverted file (IVF) indexes cluster vectors into partitions during a training step, then at query time only search the partitions closest to the query rather than the whole collection. Product quantization compresses each vector into a small code by splitting it into subvectors and quantizing each one independently, trading a bit of precision for a large reduction in memory footprint — useful when the collection is too large to fit uncompressed in RAM. Databases that combine IVF with HNSW-style graphs on top of the quantized vectors get both benefits: the partitioning cuts the search space, and the graph makes navigation within a partition fast.
+
+## Filtering and Hybrid Search
+
+Real queries are rarely pure similarity search — "find similar documents, but only ones this user can access, from the last 90 days" is the common case. Pre-filtering (narrow the candidate set by metadata, then search) breaks down when the filter is highly selective, because the ANN graph structure assumes the full dataset is searchable and a tiny filtered subset may not be well connected within it. Post-filtering (search broadly, then filter results) risks returning fewer than k results if too many top matches get filtered out. Most mature vector databases now support filtered search natively, pushing the filter into the graph traversal itself rather than applying it before or after.
+
+Hybrid search — combining vector similarity with traditional keyword (BM25) scoring — matters because pure embedding similarity is weak on exact-match needs like product SKUs, error codes, or proper nouns that the embedding model may not have seen distinctly during training. Reciprocal rank fusion is the common way to merge the two ranked lists without needing to calibrate scores across fundamentally different scales.
+
+## Picking a Vector Database
+
+The decision usually comes down to how much you want to operate versus how much you want to embed into an existing system:
+
+<Tradeoff
+  optionA="Dedicated vector database"
+  optionB="Vector extension on existing database"
+  a={["Purpose-built ANN performance at scale", "Another system to operate, another data-consistency boundary"]}
+  b={["One database, one transaction boundary, simpler ops", "ANN performance and feature set usually trail dedicated options"]}
+  recommendation="Start with a vector extension on the database you already run in production; migrate to a dedicated system only once query volume or recall requirements actually demand it."
+/>
+
+<Callout type="insight">
+The metadata filtering story matters more than the raw ANN benchmark numbers for most applications. A database that's 10% slower on an unfiltered million-vector benchmark but supports fast native filtering will usually beat one that's faster unfiltered but forces you to over-fetch and filter in application code.
+</Callout>
+
+## Operational Costs
+
+Vector indexes are memory-hungry — HNSW graphs are typically kept fully in RAM for query latency, and a million 1536-dimension float32 vectors plus graph overhead can easily exceed 8 GB. Rebuilding an index after a bulk deletion or a model swap is not instantaneous either; plan for it as a real maintenance operation with its own runbook, not a background task you can ignore.
+
+Sharding a vector index across nodes introduces its own recall tradeoff: query each shard independently and merge the top-k results, and you generally get slightly lower recall than a single unsharded index would, because a true global top-k neighbor can occasionally be split across shard boundaries in a way that a per-shard top-k merge doesn't perfectly recover. That's usually an acceptable cost for the throughput and memory headroom sharding buys, but it's worth measuring rather than assuming away.
+
+<Callout type="warning">
+Deletes in an HNSW graph are usually soft — the vector is marked removed but the graph structure and its links often aren't rebuilt immediately. Left unmanaged, a high-churn collection accumulates dead nodes that still cost memory and slow traversal, so plan for periodic compaction rather than assuming deletes are free.
+</Callout>
+
+## Takeaway
+
+A vector database is an ANN index with a query API wrapped around it, and the interesting engineering decisions — `M`, `ef_search`, filtering strategy, memory budget — are the same ones you'd face building the index yourself. Choose based on your filtering needs and operational footprint first; raw nearest-neighbor throughput is rarely the actual bottleneck once metadata filtering and reranking enter the picture.

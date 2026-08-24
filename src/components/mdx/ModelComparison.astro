@@ -1,0 +1,126 @@
+---
+import { Layers } from 'lucide-react';
+
+interface Model {
+  name: string;
+  context?: string;
+  strengths?: string;
+  tradeoff?: string;
+}
+
+interface Props {
+  models?: Model[];
+  caption?: string;
+}
+
+const { models = [], caption } = Astro.props;
+---
+
+<figure class="models">
+  <figcaption class="models-head">
+    <Layers size={13} strokeWidth={2} aria-hidden="true" />
+    <span>{caption ?? 'Model comparison'}</span>
+  </figcaption>
+  <div class="models-scroll">
+    <table>
+      <thead>
+        <tr>
+          <th scope="col">Model</th>
+          <th scope="col">Context</th>
+          <th scope="col">Strengths</th>
+          <th scope="col">Trade-off</th>
+        </tr>
+      </thead>
+      <tbody>
+        {
+          models.map((model) => (
+            <tr>
+              <th scope="row">
+                <code>{model.name}</code>
+              </th>
+              <td class="num">{model.context ?? '—'}</td>
+              <td>{model.strengths ?? '—'}</td>
+              <td class="muted">{model.tradeoff ?? '—'}</td>
+            </tr>
+          ))
+        }
+      </tbody>
+    </table>
+  </div>
+</figure>
+
+<style>
+  .models {
+    margin-block: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .models-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .models-head :global(svg) {
+    color: var(--accent-cyan);
+  }
+
+  .models-scroll {
+    overflow-x: auto;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.875rem;
+    text-align: left;
+  }
+
+  th[scope='col'] {
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 0.6rem 0.9rem;
+    white-space: nowrap;
+  }
+
+  td,
+  th[scope='row'] {
+    padding: 0.7rem 0.9rem;
+    border-top: 1px solid var(--border-subtle);
+    vertical-align: top;
+    color: var(--text-secondary);
+    font-weight: 400;
+  }
+
+  th[scope='row'] code {
+    font-family: var(--font-mono);
+    font-size: 0.8125rem;
+    color: var(--accent-cyan);
+    white-space: nowrap;
+  }
+
+  .num {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    white-space: nowrap;
+  }
+
+  .muted {
+    color: var(--text-muted);
+  }
+</style>

@@ -1,0 +1,85 @@
+---
+import TopicBadge from '../TopicBadge.astro';
+import { ContentRepository } from '../../../lib/content';
+import { slugify } from '../../../lib/utils';
+
+interface Props {
+  limit?: number;
+}
+
+const { limit = 14 } = Astro.props;
+
+// Counts come straight from the collections — nothing is maintained
+// by hand, so the cloud reshapes itself as content is added.
+const topics = await ContentRepository.tagCounts(limit);
+const max = topics[0]?.count ?? 1;
+
+/**
+ * A tag is linked to the pillar where it appears most often, so
+ * "Embeddings" lands on /ai and "Caching" on /concepts.
+ */
+const all = await ContentRepository.all();
+const homePillar = new Map<string, string>();
+for (const { tag } of topics) {
+  const tally = new Map<string, number>();
+  for (const entry of all) {
+    if (entry.tags.includes(tag)) {
+      tally.set(entry.pillar, (tally.get(entry.pillar) ?? 0) + 1);
+    }
+  }
+  const best = [...tally.entries()].sort((a, b) => b[1] - a[1])[0];
+  homePillar.set(tag, best ? best[0] : 'concepts');
+}
+
+const hrefFor = (tag: string) => {
+  const pillar = homePillar.get(tag) ?? 'concepts';
+  const base = pillar === 'concepts' ? '/concepts' : pillar === 'ai' ? '/ai' : '/system-design';
+  return `${base}?tag=${slugify(tag)}`;
+};
+---
+
+<div class="topics">
+  <ul>
+    {
+      topics.map((topic) => (
+        <li style={`--weight:${(topic.count / max).toFixed(2)}`}>
+          <TopicBadge tag={topic.tag} count={topic.count} href={hrefFor(topic.tag)} size="md" />
+        </li>
+      ))
+    }
+  </ul>
+</div>
+
+<style>
+  ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Frequency drives emphasis, not font size — keeping one type size
+     keeps the row scannable while still ranking visually. */
+  li :global(.badge) {
+    border-color: color-mix(
+      in oklab,
+      var(--pillar) calc(var(--weight) * 45%),
+      var(--border-subtle)
+    );
+    background: color-mix(
+      in oklab,
+      var(--pillar-wash) calc(var(--weight) * 100%),
+      var(--surface)
+    );
+  }
+
+  li :global(.badge-text) {
+    color: color-mix(
+      in oklab,
+      var(--text-primary) calc(var(--weight) * 100%),
+      var(--text-muted)
+    );
+  }
+</style>

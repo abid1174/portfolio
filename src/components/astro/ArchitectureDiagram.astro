@@ -1,0 +1,215 @@
+---
+/**
+ * Abstract schematic thumbnails for system-design cards and article
+ * headers. Hand-drawn SVG rather than raster art: they scale, they
+ * inherit the pillar accent, and they add no network requests.
+ */
+interface Props {
+  variant?: 'fanout' | 'keyvalue' | 'realtime' | 'pipeline' | 'storage' | 'mesh';
+  caption?: string;
+  /** `card` is the compact thumbnail; `block` is the in-article size. */
+  size?: 'card' | 'block';
+  class?: string;
+}
+
+const { variant = 'mesh', caption, size = 'card', class: className = '' } = Astro.props;
+---
+
+<figure class:list={['schematic', `is-${size}`, className]}>
+  <svg
+    viewBox="0 0 160 90"
+    fill="none"
+    role="img"
+    aria-label={caption ?? `${variant} architecture schematic`}
+    preserveAspectRatio="xMidYMid meet"
+  >
+    <defs>
+      <pattern id={`grid-${variant}`} width="10" height="10" patternUnits="userSpaceOnUse">
+        <path d="M10 0H0V10" class="grid" stroke-width="0.5"></path>
+      </pattern>
+    </defs>
+    <rect width="160" height="90" fill={`url(#grid-${variant})`} opacity="0.5"></rect>
+
+    {
+      variant === 'fanout' && (
+        <g>
+          <path
+            class="edge"
+            d="M46 45h14M60 45C72 45 72 24 84 24M60 45C72 45 72 45 84 45M60 45C72 45 72 66 84 66"
+          />
+          <rect class="node primary" x="18" y="35" width="28" height="20" rx="4" />
+          <rect class="node" x="84" y="15" width="34" height="18" rx="4" />
+          <rect class="node" x="84" y="36" width="34" height="18" rx="4" />
+          <rect class="node" x="84" y="57" width="34" height="18" rx="4" />
+          <circle class="dot" cx="132" cy="24" r="2.5" />
+          <circle class="dot" cx="132" cy="45" r="2.5" />
+          <circle class="dot" cx="132" cy="66" r="2.5" />
+          <path class="edge" d="M118 24h11M118 45h11M118 66h11" />
+        </g>
+      )
+    }
+
+    {
+      variant === 'keyvalue' && (
+        <g>
+          <rect class="node primary" x="16" y="36" width="36" height="18" rx="4" />
+          <path class="edge" d="M52 45h16" />
+          <path class="edge dashed" d="M100 30h14M100 45h14M100 60h14" />
+          <rect class="node" x="68" y="22" width="32" height="14" rx="3" />
+          <rect class="node accent" x="68" y="39" width="32" height="14" rx="3" />
+          <rect class="node" x="68" y="56" width="32" height="14" rx="3" />
+          <rect class="node ghost" x="114" y="22" width="30" height="48" rx="4" />
+          <path class="edge" d="M120 34h18M120 45h18M120 56h12" />
+        </g>
+      )
+    }
+
+    {
+      variant === 'realtime' && (
+        <g>
+          <rect class="node" x="12" y="20" width="28" height="16" rx="4" />
+          <rect class="node" x="12" y="54" width="28" height="16" rx="4" />
+          <rect class="node primary" x="62" y="33" width="36" height="24" rx="5" />
+          <rect class="node" x="120" y="20" width="28" height="16" rx="4" />
+          <rect class="node" x="120" y="54" width="28" height="16" rx="4" />
+          <path
+            class="edge"
+            d="M40 28C52 28 52 41 62 41M40 62C52 62 52 49 62 49M98 41C110 41 110 28 120 28M98 49C110 49 110 62 120 62"
+          />
+          <circle class="pulse" cx="80" cy="45" r="4" />
+        </g>
+      )
+    }
+
+    {
+      variant === 'pipeline' && (
+        <g>
+          <rect class="node" x="8" y="36" width="28" height="18" rx="4" />
+          <rect class="node accent" x="46" y="36" width="28" height="18" rx="4" />
+          <rect class="node" x="84" y="36" width="28" height="18" rx="4" />
+          <rect class="node primary" x="122" y="36" width="30" height="18" rx="4" />
+          <path class="edge" d="M36 45h10M74 45h10M112 45h10" />
+          <path class="edge dashed" d="M22 36V22h108v14" />
+          <circle class="dot" cx="76" cy="22" r="2" />
+        </g>
+      )
+    }
+
+    {
+      variant === 'storage' && (
+        <g>
+          <rect class="node primary" x="16" y="36" width="30" height="18" rx="4" />
+          <path class="edge" d="M46 45h16" />
+          <g class="stack">
+            <rect class="node" x="62" y="18" width="42" height="12" rx="3" />
+            <rect class="node" x="62" y="33" width="42" height="12" rx="3" />
+            <rect class="node accent" x="62" y="48" width="42" height="12" rx="3" />
+            <rect class="node" x="62" y="63" width="42" height="12" rx="3" />
+          </g>
+          <path class="edge dashed" d="M104 24h20v42h-20" />
+          <rect class="node ghost" x="124" y="33" width="22" height="24" rx="4" />
+        </g>
+      )
+    }
+
+    {
+      variant === 'mesh' && (
+        <g>
+          <path
+            class="edge"
+            d="M40 26L80 45M40 64L80 45M80 45L124 26M80 45L124 64M40 26v38M124 26v38"
+          />
+          <circle class="node-c" cx="40" cy="26" r="7" />
+          <circle class="node-c" cx="40" cy="64" r="7" />
+          <circle class="node-c primary" cx="80" cy="45" r="9" />
+          <circle class="node-c" cx="124" cy="26" r="7" />
+          <circle class="node-c" cx="124" cy="64" r="7" />
+        </g>
+      )
+    }
+  </svg>
+  {caption && <figcaption>{caption}</figcaption>}
+</figure>
+
+<style>
+  .schematic {
+    margin: 0;
+  }
+
+  .is-card svg {
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+
+  .is-block {
+    margin-block: 2rem;
+  }
+  .is-block svg {
+    display: block;
+    width: 100%;
+    max-width: 34rem;
+    margin-inline: auto;
+    height: auto;
+    padding: 1.25rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .grid {
+    stroke: var(--border-subtle);
+  }
+
+  .node,
+  .node-c {
+    fill: var(--surface-raised);
+    stroke: var(--border-strong);
+    stroke-width: 1;
+  }
+
+  .node.primary,
+  .node-c.primary {
+    stroke: var(--pillar);
+    fill: color-mix(in oklab, var(--pillar) 14%, var(--surface-raised));
+  }
+
+  .node.accent {
+    stroke: color-mix(in oklab, var(--pillar) 60%, var(--border-strong));
+  }
+
+  .node.ghost {
+    fill: transparent;
+    stroke-dasharray: 3 3;
+  }
+
+  .edge {
+    stroke: var(--border-strong);
+    stroke-width: 1;
+    stroke-linecap: round;
+  }
+
+  .edge.dashed {
+    stroke-dasharray: 3 3;
+    opacity: 0.7;
+  }
+
+  .dot {
+    fill: var(--pillar);
+  }
+
+  .pulse {
+    fill: var(--pillar);
+    opacity: 0.85;
+  }
+
+  figcaption {
+    margin-top: 0.65rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    text-align: center;
+  }
+</style>

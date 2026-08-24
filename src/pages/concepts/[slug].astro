@@ -1,0 +1,26 @@
+---
+import { render } from 'astro:content';
+import ConceptLayout from '../../layouts/ConceptLayout.astro';
+import { mdxComponents } from '../../components/mdx/components';
+import { ContentRepository } from '../../lib/content';
+
+export async function getStaticPaths() {
+  const entries = await ContentRepository.byPillar('concepts');
+  // Only the slug travels in props; the repository is cached, so
+  // re-reading the entry below costs nothing.
+  return entries.map((entry) => ({ params: { slug: entry.slug } }));
+}
+
+const { slug } = Astro.params;
+const entry = await ContentRepository.bySlug('concepts', slug!);
+
+if (!entry) {
+  return Astro.rewrite('/404');
+}
+
+const { Content, headings } = await render(entry.raw);
+---
+
+<ConceptLayout entry={entry} headings={headings}>
+  <Content components={mdxComponents} />
+</ConceptLayout>

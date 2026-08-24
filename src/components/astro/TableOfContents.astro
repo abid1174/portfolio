@@ -1,0 +1,167 @@
+---
+import type { MarkdownHeading } from 'astro';
+
+interface Props {
+  headings: MarkdownHeading[];
+  title?: string;
+  /** Deepest heading level to include. */
+  maxDepth?: number;
+}
+
+const { headings, title = 'On this page', maxDepth = 3 } = Astro.props;
+
+// h1 belongs to the page header, not the article body.
+const items = headings.filter((h) => h.depth > 1 && h.depth <= maxDepth);
+---
+
+{
+  items.length > 1 && (
+    <nav class="toc" aria-labelledby="toc-title" data-toc>
+      <p class="label-mono" id="toc-title">
+        {title}
+      </p>
+      <ol>
+        {items.map((heading, i) => (
+          <li class:list={[`depth-${heading.depth}`]}>
+            <a href={`#${heading.slug}`} data-toc-link={heading.slug}>
+              <span class="toc-index" aria-hidden="true">
+                {heading.depth === 2 ? String(i + 1).padStart(2, '0') : ''}
+              </span>
+              <span class="toc-text">{heading.text}</span>
+            </a>
+          </li>
+        ))}
+      </ol>
+    </nav>
+  )
+}
+
+<script>
+  /**
+   * Scroll-spy for the table of contents. Deliberately vanilla — it
+   * needs no state beyond the DOM, so shipping a framework runtime
+   * for it would be waste.
+   *
+   * A scroll listener rather than an IntersectionObserver: a fast
+   * scroll can carry a heading clean through an observer's margin
+   * band between frames, leaving the highlight stuck on a section
+   * the reader passed long ago.
+   */
+  const toc = document.querySelector('[data-toc]');
+  if (toc) {
+    const links = new Map<string, HTMLAnchorElement>();
+    toc.querySelectorAll<HTMLAnchorElement>('[data-toc-link]').forEach((link) => {
+      links.set(link.dataset.tocLink!, link);
+    });
+
+    const headings = [...links.keys()]
+      .map((id) => document.getElementById(id))
+      .filter((el): el is HTMLElement => el !== null);
+
+    let activeId: string | null = null;
+
+    const setActive = (id: string | null) => {
+      if (id === activeId) return;
+      if (activeId) links.get(activeId)?.removeAttribute('aria-current');
+      if (id) {
+        const link = links.get(id);
+        link?.setAttribute('aria-current', 'true');
+        link?.scrollIntoView({ block: 'nearest' });
+      }
+      activeId = id;
+    };
+
+    const update = () => {
+      // The reading line sits a quarter of the way down the viewport:
+      // the last heading above it is the section being read.
+      const line = window.innerHeight * 0.25;
+      let current: string | null = headings[0]?.id ?? null;
+      for (const heading of headings) {
+        if (heading.getBoundingClientRect().top > line) break;
+        current = heading.id;
+      }
+
+      // At the very bottom the last section may never reach the line.
+      const atBottom =
+        window.scrollY + window.innerHeight >= document.documentElement.scrollHeight - 2;
+      if (atBottom) current = headings[headings.length - 1]?.id ?? current;
+
+      setActive(current);
+    };
+
+    let queued = false;
+    const onScroll = () => {
+      if (queued) return;
+      queued = true;
+      requestAnimationFrame(() => {
+        queued = false;
+        update();
+      });
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('resize', onScroll, { passive: true });
+    update();
+  }
+</script>
+
+<style>
+  .toc {
+    font-size: 0.8125rem;
+  }
+
+  #toc-title {
+    margin: 0 0 0.75rem;
+  }
+
+  ol {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    border-left: 1px solid var(--border-subtle);
+  }
+
+  li a {
+    display: flex;
+    gap: 0.5rem;
+    padding: 0.3rem 0 0.3rem 0.85rem;
+    margin-left: -1px;
+    border-left: 1px solid transparent;
+    color: var(--text-muted);
+    text-decoration: none;
+    line-height: 1.45;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+
+  li a:hover {
+    color: var(--text-primary);
+  }
+
+  li a[aria-current='true'] {
+    color: var(--pillar);
+    border-left-color: var(--pillar);
+  }
+
+  .depth-3 a {
+    padding-left: 1.75rem;
+    font-size: 0.78rem;
+  }
+
+  .toc-index {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+    flex-shrink: 0;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .depth-3 .toc-index {
+    display: none;
+  }
+
+  a[aria-current='true'] .toc-index {
+    color: var(--pillar);
+  }
+</style>

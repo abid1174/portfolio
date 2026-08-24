@@ -1,0 +1,113 @@
+---
+title: "AI Agents Explained"
+description: "What separates an agent from a single LLM call, how the agent loop actually runs, and where autonomous systems fail in practice."
+type: "ai"
+category: "Agents"
+tags: ["Agents", "Tool Calling", "LLM", "Reliability"]
+difficulty: "intermediate"
+readingTime: 12
+publishedAt: "2026-07-13"
+updatedAt: "2026-07-27"
+featured: true
+related: ["ai/tool-calling", "ai/llm-evaluation", "ai/rag"]
+---
+
+An agent, in the engineering sense, is a loop: the model decides what to do next, a tool executes that decision, the result goes back into context, and the model decides again — until it judges the task done. What makes this different from a single API call isn't the model, it's the loop and everything you have to build around it to keep the loop from running off the rails.
+
+## What Makes Something an Agent
+
+A single LLM call with a well-crafted prompt is not an agent, even if the prompt is elaborate. The defining property of an agent is that the model itself controls the control flow — it decides which tool to call, in what order, how many times, and when to stop, rather than following a sequence you hardcoded. That's a meaningful capability jump, and it comes with a meaningful reliability cost: a fixed pipeline fails the same way every time you hit the same bug, while an agent's failure mode can vary run to run because the model is making a fresh decision at every step.
+
+<Callout type="note">
+If you can write down the exact sequence of steps in advance, you want a workflow, not an agent — a hardcoded pipeline with LLM calls at specific steps. Reach for an agent only when the task genuinely requires open-ended, model-driven exploration where the right sequence of actions isn't known ahead of time.
+</Callout>
+
+## The Agent Loop
+
+<Mermaid caption="The core agent loop">{`flowchart LR
+    U[Task] --> M[Model Reasons]
+    M --> D{Tool Call Needed}
+    D -->|Yes| T[Execute Tool]
+    T --> R[Append Result to Context]
+    R --> M
+    D -->|No| F[Final Answer]`}</Mermaid>
+
+Each iteration through the loop sends the full accumulated conversation — the original task, every tool call, every tool result — back to the model, and the model decides whether it has enough information to answer or needs to call another tool. This is why agent runs get expensive quickly: context grows monotonically with every iteration, and every iteration re-sends everything that came before it.
+
+```python
+messages = [{"role": "user", "content": task}]
+
+while True:
+    response = client.messages.create(
+        model="claude-sonnet-5",
+        max_tokens=4096,
+        tools=tools,
+        messages=messages,
+    )
+    messages.append({"role": "assistant", "content": response.content})
+
+    if response.stop_reason != "tool_use":
+        break
+
+    tool_results = [execute_tool(block) for block in response.content if block.type == "tool_use"]
+    messages.append({"role": "user", "content": tool_results})
+```
+
+## Tools Are the Interface to the World
+
+An agent is only as capable as the tools it's given, and tool design is where most of the real engineering work lives. A tool with an ambiguous description gets called incorrectly even when the model's reasoning is sound — it's picking the wrong tool for a well-reasoned goal, not reasoning badly. Narrow, well-documented tools with clear failure signals beat one enormous do-everything tool almost every time.
+
+<PromptExample
+  model="claude-sonnet-5"
+  prompt={`You are a deployment agent. You have tools: check_ci_status, get_deploy_history, trigger_deploy.
+Task: Deploy the "checkout-service" to production if CI is green and the last deploy was more than 1 hour ago.`}
+  output={`I'll check CI status first.
+
+[tool_use: check_ci_status(service="checkout-service")]
+→ {"status": "passing", "last_run": "2026-07-27T14:02:00Z"}
+
+CI is green. Now checking deploy history.
+
+[tool_use: get_deploy_history(service="checkout-service", limit=1)]
+→ {"last_deploy": "2026-07-27T12:40:00Z"}
+
+Last deploy was over an hour ago and CI is passing — conditions are met.
+
+[tool_use: trigger_deploy(service="checkout-service", environment="production")]
+→ {"deploy_id": "dep_8f21", "status": "started"}
+
+Deploy triggered: dep_8f21.`}
+/>
+
+## Context Management Over Long Runs
+
+A long agent run eventually threatens to exceed the context window, and even before it does, a bloated context degrades quality — the model has to attend across an ever-growing history to find what's still relevant. Three mitigations are standard: compaction (periodically summarizing older turns into a condensed form), context editing (clearing stale tool results the model no longer needs, like the full output of a search from ten steps ago), and explicit memory (writing durable facts out to a file or store rather than keeping them live in the conversation).
+
+<Callout type="tip">
+Not every tool result needs to stay in context forever. A large file read or search result that was only needed to inform one decision can often be cleared after that decision is made — keep the decision and its outcome, drop the raw data that produced it.
+</Callout>
+
+Terminating the loop deliberately matters as much as running it. "The model stopped calling tools" is not the same thing as "the task is actually done" — a model can stop early because it ran out of ideas, hit an ambiguous state it didn't know how to resolve, or misjudged partial progress as completion. Robust agent harnesses distinguish a clean stop (explicit final answer, all sub-goals addressed) from a stalled one, and either surface the stall to a human or take a bounded number of recovery attempts before giving up.
+
+## Failure Modes Unique to Agents
+
+| Failure mode | What it looks like | Mitigation |
+|---|---|---|
+| Tool call loop | Model repeatedly calls the same tool with near-identical arguments | Cap iterations; detect repeated calls and interrupt |
+| Context poisoning | An early wrong result gets treated as fact for the rest of the run | Validate tool outputs; allow the agent to see and correct earlier errors |
+| Silent partial completion | Agent reports success having only completed part of a multi-step task | Require explicit verification steps, not self-reported completion |
+| Runaway cost | Long, unbounded loop on an ambiguous task | Token or turn budgets with graceful stop behavior |
+
+## Guardrails and Approval Gates
+
+The more autonomy you hand an agent, the more the blast radius of a mistake matters. Read-only tools — search, lookups, file reads — are comparatively safe to let an agent call without supervision. Tools with real-world side effects — sending money, deploying code, deleting data — warrant a human approval gate before execution, or at minimum a dry-run mode and an audit log of every call made.
+
+Sandboxing the execution environment is a complementary guardrail, not a substitute for approval gates. Running an agent's file and code operations in an isolated container limits the damage of a genuinely wrong action — a bad `rm` or an unintended write lands inside a disposable environment rather than production infrastructure — even when the action was one the model reasoned its way into deliberately rather than through obvious error.
+
+<Callout type="warning">
+Don't rely on prompt instructions alone to keep an agent from calling a dangerous tool inappropriately ("only trigger_deploy if you're sure"). Enforce the boundary in code — gate the tool itself behind confirmation, rate limits, or scope restrictions — because a prompt instruction is a preference the model usually follows, not a guarantee.
+</Callout>
+
+## Takeaway
+
+An agent's power comes from letting the model control its own next step, and that same property is exactly what makes agents harder to make reliable than a fixed pipeline. Design the tool surface carefully, manage context deliberately as runs get long, and put real guardrails — not just prompt language — around anything with a side effect that matters.

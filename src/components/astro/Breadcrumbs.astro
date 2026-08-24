@@ -1,0 +1,73 @@
+---
+import { ChevronRight } from 'lucide-react';
+import type { Crumb } from '../../lib/metadata';
+
+interface Props {
+  crumbs: Crumb[];
+}
+
+const { crumbs } = Astro.props;
+---
+
+<nav class="crumbs" aria-label="Breadcrumb">
+  <ol>
+    {
+      crumbs.map((crumb, i) => (
+        <li>
+          {crumb.href ? (
+            <a href={crumb.href}>{crumb.label}</a>
+          ) : (
+            <span aria-current="page">{crumb.label}</span>
+          )}
+          {i < crumbs.length - 1 && (
+            <ChevronRight size={12} strokeWidth={2} aria-hidden="true" />
+          )}
+        </li>
+      ))
+    }
+  </ol>
+</nav>
+
+<style>
+  .crumbs ol {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    display: flex;
+    align-items: center;
+    gap: 0.35rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+  }
+
+  li :global(svg) {
+    opacity: 0.5;
+  }
+
+  a {
+    color: var(--text-muted);
+    text-decoration: none;
+    transition: color var(--dur-fast) var(--ease-out);
+  }
+  a:hover {
+    color: var(--pillar);
+  }
+
+  [aria-current='page'] {
+    color: var(--text-secondary);
+    /* Long titles must not force the row to overflow. */
+    max-width: 24ch;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+</style>

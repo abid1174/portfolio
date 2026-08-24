@@ -1,0 +1,30 @@
+---
+import { Clock } from 'lucide-react';
+
+interface Props {
+  minutes: number;
+  /** `bare` drops the icon for dense metadata rows. */
+  variant?: 'icon' | 'bare';
+}
+
+const { minutes, variant = 'bare' } = Astro.props;
+---
+
+<span class="reading-time">
+  {variant === 'icon' && <Clock size={12} strokeWidth={2} aria-hidden="true" />}
+  <span>{minutes} min read</span>
+</span>
+
+<style>
+  .reading-time {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.04em;
+    color: var(--text-muted);
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+</style>

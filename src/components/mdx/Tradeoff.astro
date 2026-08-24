@@ -1,0 +1,177 @@
+---
+import { Check, GitCompareArrows } from 'lucide-react';
+
+interface Props {
+  optionA: string;
+  optionB: string;
+  a?: string[];
+  b?: string[];
+  recommendation?: string;
+}
+
+const { optionA, optionB, a = [], b = [], recommendation } = Astro.props;
+---
+
+<figure class="tradeoff">
+  <figcaption class="tradeoff-head">
+    <GitCompareArrows size={13} strokeWidth={2} aria-hidden="true" />
+    <span>Trade-off</span>
+  </figcaption>
+
+  <div class="tradeoff-grid">
+    <div class="tradeoff-col">
+      <h4 class="tradeoff-option" style="--opt:var(--accent-blue)">{optionA}</h4>
+      <ul>
+        {a.map((point) => <li>{point}</li>)}
+      </ul>
+    </div>
+    <div class="tradeoff-divider" aria-hidden="true"><span>vs</span></div>
+    <div class="tradeoff-col">
+      <h4 class="tradeoff-option" style="--opt:var(--accent-purple)">{optionB}</h4>
+      <ul>
+        {b.map((point) => <li>{point}</li>)}
+      </ul>
+    </div>
+  </div>
+
+  {
+    recommendation && (
+      <p class="tradeoff-rec">
+        <Check size={13} strokeWidth={2.5} aria-hidden="true" />
+        <span>
+          <strong>Recommendation</strong> — {recommendation}
+        </span>
+      </p>
+    )
+  }
+</figure>
+
+<style>
+  .tradeoff {
+    margin-block: 2rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    overflow: hidden;
+  }
+
+  .tradeoff-head {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border-subtle);
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .tradeoff-grid {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: stretch;
+  }
+
+  .tradeoff-col {
+    padding: 1rem 1.1rem 1.15rem;
+    min-width: 0;
+  }
+
+  .tradeoff-option {
+    margin: 0 0 0.65rem;
+    font-size: 0.9375rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .tradeoff-option::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 1px;
+    background: var(--opt);
+    flex-shrink: 0;
+  }
+
+  .tradeoff-col ul {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 0.45rem;
+  }
+
+  .tradeoff-col li {
+    position: relative;
+    padding-left: 0.95rem;
+    font-size: 0.875rem;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+  .tradeoff-col li::before {
+    content: '';
+    position: absolute;
+    left: 0;
+    top: 0.6em;
+    width: 5px;
+    height: 1px;
+    background: var(--border-strong);
+  }
+
+  .tradeoff-divider {
+    display: grid;
+    place-items: center;
+    position: relative;
+    width: 1px;
+    background: var(--border-subtle);
+  }
+  .tradeoff-divider span {
+    position: absolute;
+    padding: 0.15rem 0.35rem;
+    background: var(--surface);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .tradeoff-rec {
+    display: flex;
+    gap: 0.55rem;
+    align-items: flex-start;
+    margin: 0;
+    padding: 0.8rem 1.1rem;
+    border-top: 1px solid var(--border-subtle);
+    background: var(--wash-cyan);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: none;
+  }
+  .tradeoff-rec :global(svg) {
+    color: var(--accent-cyan);
+    flex-shrink: 0;
+    margin-top: 0.3em;
+  }
+  .tradeoff-rec strong {
+    color: var(--text-primary);
+  }
+
+  @media (max-width: 40rem) {
+    .tradeoff-grid {
+      grid-template-columns: 1fr;
+    }
+    .tradeoff-divider {
+      width: auto;
+      height: 1px;
+      margin-inline: 1.1rem;
+    }
+  }
+</style>

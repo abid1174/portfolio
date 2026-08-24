@@ -1,0 +1,112 @@
+---
+import { AlertTriangle, Info, Lightbulb, OctagonAlert, Sparkles } from 'lucide-react';
+
+type CalloutType = 'note' | 'tip' | 'warning' | 'danger' | 'insight';
+
+interface Props {
+  type?: CalloutType;
+  title?: string;
+}
+
+const { type = 'note', title } = Astro.props;
+
+const variants = {
+  note: { icon: Info, accent: 'var(--accent-blue)', wash: 'var(--wash-blue)', label: 'Note' },
+  tip: {
+    icon: Lightbulb,
+    accent: 'var(--accent-cyan)',
+    wash: 'var(--wash-cyan)',
+    label: 'Tip',
+  },
+  warning: {
+    icon: AlertTriangle,
+    accent: 'var(--accent-amber)',
+    wash: 'var(--wash-amber)',
+    label: 'Warning',
+  },
+  danger: {
+    icon: OctagonAlert,
+    accent: 'var(--accent-rose)',
+    wash: 'var(--wash-rose)',
+    label: 'Watch out',
+  },
+  insight: {
+    icon: Sparkles,
+    accent: 'var(--accent-purple)',
+    wash: 'var(--wash-purple)',
+    label: 'Insight',
+  },
+} as const;
+
+const variant = variants[type] ?? variants.note;
+const Icon = variant.icon;
+---
+
+<aside
+  class="callout"
+  style={`--callout-accent:${variant.accent};--callout-wash:${variant.wash}`}
+>
+  <div class="callout-icon" aria-hidden="true">
+    <Icon size={15} strokeWidth={2} />
+  </div>
+  <div class="callout-body">
+    <p class="callout-label">{title ?? variant.label}</p>
+    <div class="callout-content"><slot /></div>
+  </div>
+</aside>
+
+<style>
+  .callout {
+    display: flex;
+    gap: 0.85rem;
+    margin-block: 1.75rem;
+    padding: 0.95rem 1.1rem;
+    background: var(--callout-wash);
+    border: 1px solid color-mix(in oklab, var(--callout-accent) 28%, transparent);
+    border-left-width: 2px;
+    border-left-color: var(--callout-accent);
+    border-radius: var(--radius-md);
+  }
+
+  .callout-icon {
+    flex-shrink: 0;
+    display: grid;
+    place-items: center;
+    width: 1.5rem;
+    height: 1.5rem;
+    margin-top: 0.05rem;
+    border-radius: var(--radius-sm);
+    color: var(--callout-accent);
+    background: color-mix(in oklab, var(--callout-accent) 16%, transparent);
+  }
+
+  .callout-body {
+    min-width: 0;
+    flex: 1;
+  }
+
+  .callout-label {
+    margin: 0 0 0.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    font-weight: 600;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--callout-accent);
+  }
+
+  .callout-content {
+    color: var(--text-secondary);
+    font-size: 0.9375rem;
+    line-height: 1.65;
+  }
+
+  /* The callout sets its own rhythm; prose margins would double it. */
+  .callout-content :global(> * + *) {
+    margin-top: 0.7em;
+  }
+  .callout-content :global(p) {
+    margin: 0;
+    max-width: none;
+  }
+</style>

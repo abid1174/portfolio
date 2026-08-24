@@ -1,0 +1,68 @@
+---
+import { slugify } from '../../lib/utils';
+
+interface Props {
+  tag: string;
+  /** When set, the badge links to that pillar's filtered listing. */
+  href?: string;
+  count?: number;
+  size?: 'sm' | 'md';
+}
+
+const { tag, href, count, size = 'sm' } = Astro.props;
+const Tag = href ? 'a' : 'span';
+---
+
+<Tag
+  class:list={['badge', `is-${size}`, href && 'is-link']}
+  href={href}
+  data-tag={slugify(tag)}
+>
+  <span class="badge-text">{tag}</span>
+  {count !== undefined && <span class="badge-count">{count}</span>}
+</Tag>
+
+<style>
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    background: var(--surface-inset);
+    color: var(--text-secondary);
+    font-family: var(--font-mono);
+    letter-spacing: 0.02em;
+    white-space: nowrap;
+    text-decoration: none;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out),
+      background-color var(--dur-fast) var(--ease-out);
+  }
+
+  .is-sm {
+    padding: 0.13rem 0.5rem;
+    font-size: 0.6875rem;
+  }
+
+  .is-md {
+    padding: 0.3rem 0.7rem;
+    font-size: 0.8125rem;
+  }
+
+  .is-link:hover {
+    color: var(--text-primary);
+    border-color: color-mix(in oklab, var(--pillar) 45%, var(--border-default));
+    background: var(--pillar-wash);
+  }
+
+  .badge-count {
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .is-link:hover .badge-count {
+    color: var(--pillar);
+  }
+</style>

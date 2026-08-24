@@ -1,0 +1,116 @@
+---
+title: "What is RAG?"
+description: "How retrieval augmented generation grounds LLM outputs in your own data, and where the pattern breaks down in production."
+type: "ai"
+category: "RAG"
+tags: ["LLM", "RAG", "Embeddings", "Vector Databases"]
+difficulty: "beginner"
+readingTime: 10
+publishedAt: "2026-05-05"
+updatedAt: "2026-05-19"
+featured: true
+related: ["ai/embeddings", "ai/vector-databases", "ai/rag-vs-fine-tuning", "concepts/database-index"]
+---
+
+A model only knows what was in its training data, frozen at some cutoff, plus whatever you put in the prompt. Retrieval augmented generation (RAG) is the pattern for filling that gap: before you ask the model anything, you search your own data for the passages most relevant to the question and paste them into the context window.
+
+## The Core Problem RAG Solves
+
+Frontier models are trained on a snapshot. They don't know your internal wiki, your customer's account history, or the changelog you shipped this morning, and fine-tuning a model every time a document changes is not a workflow anyone runs at that frequency. RAG sidesteps retraining entirely: the model's weights stay fixed, and you change what facts it can see by changing what you retrieve.
+
+The other problem RAG addresses is grounding. Ask a model a specific factual question with no supporting context and it will sometimes answer fluently and wrongly — a hallucination that reads exactly like a correct answer. Give the model the actual source text and instruct it to answer only from that text, and you get a system whose failure mode shifts from "confidently wrong" to "correctly says it doesn't know," which is a much easier failure to catch downstream.
+
+<Callout type="note">
+RAG is not a database feature and not a single library — it's an architecture pattern built from three pieces you already understand: search, prompt construction, and generation. Most of the engineering effort goes into the search step, not the LLM call.
+</Callout>
+
+## How Retrieval Fits Into a Request
+
+A RAG request has a shape that stays consistent across implementations:
+
+<Mermaid caption="Retrieval augmented generation">{`flowchart LR
+    Q[User Query] --> E[Embed Query]
+    E --> V[Vector Search]
+    V --> R[Rank and Filter]
+    R --> C[Build Context]
+    C --> L[LLM Call]
+    L --> A[Answer]`}</Mermaid>
+
+The query gets embedded into the same vector space as your document chunks, the vector database returns the nearest neighbors, and those chunks — not the whole corpus — get concatenated into the prompt alongside instructions telling the model to answer from them. The generation step is a completely ordinary API call; nothing about it is RAG-specific except the content of the prompt.
+
+## Chunking Documents
+
+You can't embed an entire 40-page PDF as one vector and expect useful retrieval — the resulting embedding is an average of everything in the document, which matches nothing precisely. Documents get split into chunks, typically a few hundred tokens each, and each chunk gets its own embedding.
+
+Chunk size is a real tradeoff, not a knob you set once and forget:
+
+| Chunk size | Retrieval precision | Context per chunk | Risk |
+|---|---|---|---|
+| Small (~100-200 tokens) | High — narrow, specific matches | Low — may lack surrounding context | Answers cite fragments missing needed context |
+| Medium (~400-600 tokens) | Balanced | Moderate | Reasonable default for prose-heavy docs |
+| Large (~1000+ tokens) | Low — embedding blurs across topics | High | Irrelevant chunks rank highly, wasting context budget |
+
+<Callout type="tip" title="Chunk on structure first">
+Splitting on a fixed token count alone tends to cut sentences and tables in half. Split on document structure — headings, paragraphs, list boundaries — and only fall back to a token cap when a structural unit is too large on its own.
+</Callout>
+
+## Retrieval Quality vs Generation Quality
+
+It's tempting to debug a bad RAG answer by tweaking the prompt or switching to a bigger model. Most of the time that's the wrong lever. If the retrieval step didn't surface the passage that contains the answer, no amount of prompt engineering recovers it — the model is being asked to answer from context that doesn't contain the answer.
+
+A minimal retrieval pipeline in Python, using cosine similarity over precomputed chunk embeddings:
+
+```python
+import numpy as np
+
+def retrieve(query_embedding: np.ndarray, chunk_embeddings: np.ndarray, chunks: list[str], k: int = 5) -> list[str]:
+    # Assumes both are L2-normalized, so dot product == cosine similarity.
+    scores = chunk_embeddings @ query_embedding
+    top_k = np.argsort(scores)[::-1][:k]
+    return [chunks[i] for i in top_k]
+```
+
+In production this becomes a call to a vector database rather than a brute-force matrix multiply, but the logic is identical: embed the query, score every candidate, keep the top results. See "Vector Databases Explained" for how that scales past a few thousand chunks.
+
+<PromptExample
+  model="claude-sonnet-5"
+  prompt={`You are a documentation assistant. Answer only using the context below.
+If the context does not contain the answer, say you don't know.
+
+Context:
+"""
+Rate limits reset on a rolling 60-second window per API key. The default limit
+is 100 requests per minute; contact support to request a higher tier.
+"""
+
+Question: How often does my rate limit reset?`}
+  output={`Your rate limit resets on a rolling 60-second window, tied to your API key. There isn't a fixed reset time — each request is evaluated against the requests made in the preceding 60 seconds.`}
+/>
+
+## Where RAG Breaks Down
+
+RAG fails in a handful of predictable ways. Retrieval returns near-duplicate chunks that crowd out a diverse set of relevant passages. Queries phrased differently from the source text score poorly under pure embedding similarity — "how do I cancel" and "subscription termination process" are semantically close but not always close enough to rank the right chunk first. And multi-hop questions, where the answer requires combining facts from two different documents, defeat single-pass retrieval entirely because no single chunk contains the full answer.
+
+<Callout type="warning">
+Adding more chunks to the prompt is not a free fix for weak retrieval. Every irrelevant chunk you stuff into context costs tokens, adds latency, and gives the model more chances to anchor on the wrong passage. Tune the retriever before you widen `k`.
+</Callout>
+
+Reranking helps: retrieve a wider candidate set with a fast approximate method, then run a smaller cross-encoder model over just those candidates to reorder them by actual relevance to the query. It's slower than pure vector search but far cheaper than running every document through a cross-encoder, and it typically fixes a meaningful share of near-miss retrieval failures.
+
+## Evaluating a RAG System
+
+You can't tell if RAG is working by reading a handful of transcripts. Two numbers matter most: retrieval recall (did the relevant chunk make it into the top-k results at all) and answer faithfulness (does the generated answer actually follow from the retrieved context, or did the model drift back to parametric knowledge). Track both separately — a system can have perfect retrieval and still hallucinate on top of good context, and a system can have flawless generation discipline while retrieving the wrong passages every time.
+
+```json
+{
+  "query": "what is the default rate limit",
+  "retrieved_chunk_ids": ["docs-42", "docs-07", "docs-19"],
+  "relevant_chunk_id": "docs-42",
+  "recall_at_3": true,
+  "answer_faithful": true
+}
+```
+
+## Takeaway
+
+RAG is search plus generation, not a new capability bolted onto the model. Its ceiling is set by the retrieval step — chunking strategy, embedding model choice, and reranking — far more than by which LLM you call at the end. Get retrieval right first; the generation step is comparatively easy to get right once the model is looking at the correct text.

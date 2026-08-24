@@ -1,0 +1,136 @@
+---
+title: "Prompt Engineering Fundamentals"
+description: "Structuring prompts, choosing between system and user content, and the failure modes that show up once a prompt leaves the playground."
+type: "ai"
+category: "Prompt Engineering"
+tags: ["Prompt Engineering", "LLM", "Evaluation", "API Design"]
+difficulty: "beginner"
+readingTime: 11
+publishedAt: "2026-06-15"
+updatedAt: "2026-06-29"
+featured: true
+related: ["ai/rag", "ai/llm-evaluation", "ai/tool-calling"]
+---
+
+Prompt engineering has a reputation as trial and error, and a lot of it still is. But the parts that actually generalize across models and tasks are ordinary engineering discipline: clear structure, explicit constraints, and testing against real inputs rather than the three examples you tried in a chat window.
+
+## Why Prompting Is Still an Engineering Problem
+
+A prompt is an interface, and interfaces have the same failure modes whether the thing on the other end is a REST API or a language model: ambiguous inputs produce inconsistent outputs, missing constraints get filled in with whatever the model assumes, and untested edge cases fail in production instead of in review. The difference from a typical API is that the model doesn't reject a malformed request with a 400 — it does its best to answer anyway, which means prompt bugs surface as subtly wrong output rather than a stack trace.
+
+<Callout type="note">
+Treat a prompt like you'd treat a function signature: inputs, expected output shape, and the constraints that make the output usable downstream. If you can't write down what a correct response looks like, you can't reliably prompt for it either.
+</Callout>
+
+## Structure Beats Cleverness
+
+The single highest-leverage change most prompts need isn't cleverer wording — it's structure. Separate the role, the task, the constraints, and the input data into clearly delimited sections instead of one paragraph of run-on instructions. XML-style tags work well because they're unambiguous about where one section ends and another begins, which matters more as prompts grow.
+
+```text
+You are a support ticket classifier.
+
+<task>
+Classify the ticket into exactly one category: billing, bug, feature.
+</task>
+
+<constraints>
+- Respond with JSON only, no prose.
+- If the ticket is ambiguous, choose the category the customer's language most emphasizes.
+</constraints>
+
+<ticket>
+{ticket_text}
+</ticket>
+```
+
+<Callout type="tip">
+Put the actual data (the ticket, the document, the transcript) after the instructions, not before. Instructions that come after a large block of data compete with everything the model just read for attention, and in practice get followed less reliably.
+</Callout>
+
+## System Prompts vs User Messages
+
+The system prompt is the right place for content that's stable across every call — role definition, output format, tone, tool descriptions. The user message is the right place for the actual per-request input. Mixing them — rebuilding a slightly different "system" instruction on every call — defeats prompt caching, since caching depends on a stable prefix that doesn't change byte-for-byte between requests.
+
+| Content | Belongs in |
+|---|---|
+| Role, persona, global constraints | System prompt |
+| Output format instructions | System prompt |
+| Few-shot examples (if stable) | System prompt |
+| The specific question or document | User message |
+| Conversation history | Messages array |
+
+## Few-Shot Examples
+
+Zero-shot prompting — just describing the task — works fine for tasks the model has clearly seen the shape of during training. For anything with a specific, non-obvious output convention (a particular JSON schema, a house style, an unusual classification boundary), two or three well-chosen examples typically outperform a much longer prose description of the same rules. Pick examples that cover edge cases, not just the easy majority case — an example set that's all straightforward tickets won't teach the model what to do with an ambiguous one.
+
+<PromptExample
+  model="claude-sonnet-5"
+  prompt={`You are a support triage assistant.
+Classify the ticket below into: billing, bug, feature.
+Respond with JSON only.
+
+Examples:
+Ticket: "The app crashes when I upload a PDF over 10MB."
+{"category": "bug", "confidence": 0.97}
+
+Ticket: "Could you add dark mode?"
+{"category": "feature", "confidence": 0.95}
+
+Ticket: My invoice shows twice the usual amount.`}
+  output={`{"category": "billing", "confidence": 0.94}`}
+/>
+
+Example ordering matters more than people expect. Models weight recent context more heavily, so the last example in a few-shot list tends to have outsized influence on the output — if your examples aren't representative of the true class distribution, put the most common case last, not the rarest edge case, or you'll bias the model toward over-predicting whatever category happened to close out the list.
+
+## Structured Output
+
+Asking a model to "return JSON" in prose is unreliable at the margins — it'll usually work, then occasionally wrap the JSON in prose, add a trailing comment, or produce a field name that's close but not exact. Where the API supports schema-constrained output, use it instead of parsing free text; it turns a probabilistic formatting problem into a guarantee enforced at generation time rather than a regex you maintain forever.
+
+```ts
+const response = await client.messages.create({
+  model: "claude-sonnet-5",
+  max_tokens: 256,
+  output_config: {
+    format: {
+      type: "json_schema",
+      schema: {
+        type: "object",
+        properties: {
+          category: { type: "string", enum: ["billing", "bug", "feature"] },
+          confidence: { type: "number" },
+        },
+        required: ["category", "confidence"],
+      },
+    },
+  },
+  messages: [{ role: "user", content: ticketText }],
+});
+```
+
+## Model Selection Affects Prompting
+
+A prompt tuned for one model tier isn't automatically portable to another. Smaller, faster models generally need more explicit structure and fewer implicit assumptions; larger models tolerate — and sometimes benefit from — more open-ended instructions and can infer intent from less scaffolding.
+
+<ModelComparison
+  models={[
+    { name: "claude-opus-5", context: "1M", strengths: "Deepest reasoning, long multi-step tasks, ambiguous instructions", tradeoff: "Higher latency and cost for simple tasks" },
+    { name: "claude-sonnet-5", context: "1M", strengths: "Balanced quality and speed, default for most production prompts", tradeoff: "Occasionally needs more explicit structure than Opus for edge cases" },
+    { name: "claude-haiku-4-5-20251001", context: "200K", strengths: "Fast, cheap for classification and extraction", tradeoff: "Needs tightly structured prompts; weaker on multi-step reasoning" }
+  ]}
+/>
+
+## Common Failure Modes
+
+Instruction dilution is the most common one: as a prompt accumulates more and more special-case rules over time, earlier constraints quietly stop being followed as reliably, because the model is balancing an increasing number of competing instructions. Periodically rewrite rather than endlessly append.
+
+<Callout type="warning">
+"Never do X" instructions are weaker than positive instructions describing what to do instead. A prompt that lists ten things not to do gives the model ten ways to accidentally violate one while satisfying the others. State the desired behavior directly wherever you can.
+</Callout>
+
+Context poisoning shows up in multi-turn agents: an early wrong answer or malformed tool call, left uncorrected in the conversation history, gets treated as established fact on every subsequent turn and compounds.
+
+Overfitting to the playground is the last one, and it's easy to miss because it doesn't feel like a mistake while you're doing it. Iterating on a prompt against the same three or four examples until they all pass produces a prompt tuned to those specific examples' phrasing, not to the underlying task — the moment real traffic sends a slightly different phrasing of the same request, performance can drop noticeably even though nothing about the task changed. Iterate against a held-out eval set large enough to actually represent the input distribution, and resist the urge to keep hand-tuning against the same handful of cases you already know pass.
+
+## Takeaway
+
+Good prompts read like good function contracts — structured, unambiguous about output shape, and tested against inputs that actually resemble production traffic, not just the three cases that worked in a scratch session. Prompting is not separate from the rest of engineering discipline; it's the same discipline applied to a probabilistic interface.

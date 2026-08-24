@@ -1,39 +1,74 @@
 ---
-import Base from '../layouts/Base.astro';
-import Nav from '../components/Nav';
-import Hero from '../components/Hero';
-import Marquee from '../components/Marquee.astro';
-import Work from '../components/Work';
-import About from '../components/About';
-import Contact from '../components/Contact';
-import { site } from '../lib/site';
+import PageLayout from '../layouts/PageLayout.astro';
+import Hero from '../components/astro/Hero.astro';
+import SectionHeader from '../components/astro/SectionHeader.astro';
+import TopicExplorer from '../components/astro/home/TopicExplorer.astro';
+import LatestContent from '../components/astro/home/LatestContent.astro';
+import PopularTopics from '../components/astro/home/PopularTopics.astro';
+import FeaturedSystemDesigns from '../components/astro/home/FeaturedSystemDesigns.astro';
+import LearningCTA from '../components/astro/home/LearningCTA.astro';
+import { ContentRepository } from '../lib/content';
+import { site } from '../data/site';
 
-const year = new Date().getFullYear();
+const stats = await ContentRepository.stats();
 ---
 
-<Base title={`${site.name} — ${site.role}`} description={site.intro}>
-  <Nav client:load name={site.name} />
+<PageLayout title={site.title} description={site.description}>
+  <div class="home">
+    <Hero stats={stats} />
 
-  <main>
-    <Hero
-      client:load
-      name={site.name}
-      role={site.role}
-      intro={site.intro}
-      location={site.location}
-    />
+    <section class="block">
+      <SectionHeader
+        eyebrow="Three pillars"
+        title="Explore by topic"
+        description="Everything on this site belongs to one of three tracks. Start wherever your current problem is."
+      />
+      <TopicExplorer stats={stats} />
+    </section>
 
-    <Marquee items={site.skills} />
+    <section class="block">
+      <SectionHeader
+        eyebrow="Recently written"
+        title="Latest from each track"
+        description="Newest first, across all three collections."
+      />
+      <LatestContent />
+    </section>
 
-    <Work client:visible projects={site.projects} />
-    <About client:visible paragraphs={site.about} skills={site.skills} />
-    <Contact client:visible email={site.email} links={site.links} />
-  </main>
+    <section class="pillar-system-design block">
+      <SectionHeader
+        eyebrow="Deep dives"
+        title="Featured system designs"
+        description="Full walkthroughs — requirements, capacity, architecture and the trade-offs behind each decision."
+        href="/system-design"
+        linkLabel="All system designs"
+      />
+      <FeaturedSystemDesigns />
+    </section>
 
-  <footer class="footer">
-    <div class="wrap footer__inner">
-      <span>© {year} {site.name}</span>
-      <span>Built with Astro &amp; React</span>
-    </div>
-  </footer>
-</Base>
+    <section class="block">
+      <SectionHeader
+        eyebrow={`${stats.tags} tags in use`}
+        title="Popular topics"
+        description="Generated from tag frequency across every article. Follow one to filter the library."
+      />
+      <PopularTopics />
+    </section>
+
+    <section class="block">
+      <LearningCTA stats={stats} />
+    </section>
+  </div>
+</PageLayout>
+
+<style>
+  .home {
+    display: grid;
+    gap: clamp(2.5rem, 6vw, 4rem);
+  }
+
+  .block {
+    display: grid;
+    gap: 1.25rem;
+  }
+</style>

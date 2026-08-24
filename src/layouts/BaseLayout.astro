@@ -1,0 +1,94 @@
+---
+import { Font } from 'astro:assets';
+import { site } from '../data/site';
+import { buildMeta, siteJsonLd, type MetaInput } from '../lib/metadata';
+import '../styles/global.css';
+
+// `pathname` is filled in from `Astro.url`, never passed by callers.
+type Props = Omit<MetaInput, 'pathname'> & {
+  /** Extra JSON-LD graphs for this page. */
+  jsonLd?: unknown[];
+  /** Pillar class applied to <body>, rebinding the accent tokens. */
+  pillarClass?: string;
+};
+
+const { jsonLd = [], pillarClass, ...metaInput } = Astro.props;
+const meta = buildMeta({ ...metaInput, pathname: Astro.url.pathname });
+const graphs = [...siteJsonLd(), ...jsonLd];
+---
+
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <meta name="generator" content={Astro.generator} />
+
+    <title>{meta.title}</title>
+    <meta name="description" content={meta.description} />
+    <link rel="canonical" href={meta.canonical} />
+    {meta.noindex && <meta name="robots" content="noindex, follow" />}
+
+    <!-- Open Graph -->
+    <meta property="og:type" content={meta.type} />
+    <meta property="og:title" content={meta.title} />
+    <meta property="og:description" content={meta.description} />
+    <meta property="og:url" content={meta.canonical} />
+    <meta property="og:site_name" content={site.title} />
+    <meta property="og:locale" content={site.locale} />
+    <meta property="og:image" content={meta.image} />
+    <meta property="og:image:alt" content={meta.title} />
+    {
+      meta.publishedTime && (
+        <meta property="article:published_time" content={meta.publishedTime} />
+      )
+    }
+    {meta.modifiedTime && <meta property="article:modified_time" content={meta.modifiedTime} />}
+    {meta.publishedTime && <meta property="article:author" content={site.name} />}
+    {meta.tags?.map((tag) => <meta property="article:tag" content={tag} />)}
+
+    <!-- Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={meta.title} />
+    <meta name="twitter:description" content={meta.description} />
+    <meta name="twitter:image" content={meta.image} />
+
+    <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
+    <link rel="sitemap" href="/sitemap-index.xml" />
+
+    <Font cssVariable="--font-inter" preload />
+    <Font cssVariable="--font-jetbrains" />
+
+    <script is:inline>
+      // Applies the saved theme before first paint. Inline and blocking
+      // on purpose — anything async here would flash the wrong theme.
+      (function () {
+        try {
+          const choice = localStorage.getItem('portfolio:theme') || 'dark';
+          const resolved =
+            choice === 'system'
+              ? window.matchMedia('(prefers-color-scheme: light)').matches
+                ? 'light'
+                : 'dark'
+              : choice;
+          document.documentElement.dataset.theme = resolved;
+          document.documentElement.dataset.themeChoice = choice;
+        } catch {
+          document.documentElement.dataset.theme = 'dark';
+        }
+      })();
+    </script>
+
+    {
+      graphs.map((graph) => (
+        <script type="application/ld+json" is:inline set:html={JSON.stringify(graph)} />
+      ))
+    }
+  </head>
+
+  <body class={pillarClass} data-drawer="closed">
+    <a class="skip-link" href="#main">Skip to content</a>
+    <slot />
+  </body>
+</html>

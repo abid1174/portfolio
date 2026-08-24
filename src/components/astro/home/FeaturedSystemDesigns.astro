@@ -1,0 +1,48 @@
+---
+import SystemDesignCard from '../SystemDesignCard.astro';
+import { ContentRepository } from '../../../lib/content';
+
+interface Props {
+  limit?: number;
+}
+
+const { limit = 4 } = Astro.props;
+const entries = await ContentRepository.featured('system-design', limit);
+---
+
+<ul class="featured">
+  {
+    entries.map((entry) => (
+      <li>
+        <SystemDesignCard entry={entry} />
+      </li>
+    ))
+  }
+</ul>
+
+<style>
+  .featured {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  li {
+    min-width: 0;
+  }
+
+  @media (max-width: 72rem) {
+    .featured {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .featured {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>

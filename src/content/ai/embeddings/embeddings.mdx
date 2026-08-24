@@ -1,0 +1,91 @@
+---
+title: "What are Embeddings?"
+description: "How text becomes a vector, why cosine similarity works as a proxy for meaning, and what actually determines embedding quality."
+type: "ai"
+category: "Embeddings"
+tags: ["Embeddings", "LLM", "Vector Databases", "Performance"]
+difficulty: "beginner"
+readingTime: 9
+publishedAt: "2026-05-18"
+updatedAt: "2026-06-01"
+featured: true
+related: ["ai/rag", "ai/vector-databases", "concepts/database-index"]
+---
+
+An embedding is a list of floating-point numbers that represents a piece of text such that texts with similar meaning end up as nearby points in that number space. Everything RAG, semantic search, and recommendation systems do with "meaning" is really just arithmetic on these vectors.
+
+## From Text to Numbers
+
+An embedding model is a neural network trained so that its output vector captures semantic content rather than surface form. Two sentences that share almost no words but mean the same thing — "the invoice was billed twice" and "I got charged double" — land close together in vector space, while two sentences that share many words but mean different things land farther apart than you'd expect from word overlap alone.
+
+```python
+from anthropic import Anthropic
+
+client = Anthropic()
+
+def embed(text: str) -> list[float]:
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=1,
+        messages=[{"role": "user", "content": f"embed: {text}"}],
+    )
+    # Illustrative only — in practice, use a dedicated embeddings endpoint
+    # or model rather than repurposing a chat completion.
+    return response.usage.__dict__.get("embedding", [])
+```
+
+<Callout type="warning">
+That snippet is deliberately illustrative, not a real embeddings call — chat completion models are not embedding models. Use a model built and trained specifically to output embeddings; mixing the two produces vectors with none of the geometric properties similarity search depends on.
+</Callout>
+
+Real embedding models are trained with a contrastive objective: pull matching pairs (a question and its answer, two paraphrases) together in vector space, push unrelated pairs apart. That objective, not the model's parameter count, is what determines whether the resulting geometry is actually useful for search.
+
+## Similarity Metrics
+
+Once you have vectors, "similar" needs a precise definition. The two you'll encounter constantly:
+
+| Metric | Formula intuition | When to use |
+|---|---|---|
+| Cosine similarity | Angle between two vectors, ignores magnitude | Default for most text embeddings; magnitude often just reflects text length |
+| Dot product | Cosine similarity times both magnitudes | Faster to compute; equivalent to cosine if vectors are pre-normalized to unit length |
+| Euclidean distance | Straight-line distance between points | Common in clustering; less standard for text similarity |
+
+Most embedding models are trained and benchmarked against cosine similarity specifically, so unless you have a concrete reason to deviate, normalize your vectors and use cosine (or the equivalent normalized dot product, which is cheaper on most hardware).
+
+<Callout type="insight" title="Normalization matters more than the metric">
+A common bug: mixing normalized query vectors with un-normalized document vectors, or vice versa. The similarity scores still come back as numbers that look plausible, they're just wrong — and nothing in the pipeline raises an error to tell you.
+</Callout>
+
+## Dimensionality and Cost
+
+Embedding models output vectors of a fixed size — commonly somewhere between 256 and 3072 dimensions depending on the model. Higher dimensionality generally captures finer-grained distinctions, but it's not free: storage scales linearly with dimension count, and so does the cost of computing similarity across a large index. A million 1536-dimension float32 vectors is roughly 6 GB before you've added any metadata or index overhead.
+
+Some newer embedding models support Matryoshka representation learning, where you can truncate the vector to a shorter prefix — say the first 256 of 1536 dimensions — and still get a usable, if less precise, embedding. That's a genuine cost lever: store the full vector, search with a truncated one for a fast first pass, then rerank the top candidates with the full vector.
+
+## Choosing an Embedding Model
+
+The wrong axis to optimize first is raw benchmark score. The right axis is: does this model perform well on text that looks like yours? A model tuned on web prose can underperform a smaller, domain-tuned model on legal contracts or source code. Before committing to a model for a RAG pipeline, run a retrieval eval — a set of real queries with known correct chunks — against a couple of candidate models rather than trusting a leaderboard number.
+
+<Callout type="tip">
+Whatever embedding model you pick, embed queries and documents with the exact same model and the exact same preprocessing (lowercasing, whitespace handling, truncation length). Embeddings from two different model versions are not comparable, even if the model name looks the same.
+</Callout>
+
+Multilingual coverage is a separate axis from general quality, and it's easy to assume a model handles it well without checking. A model that scores well on English retrieval benchmarks can perform noticeably worse when the query and the matching document are in different languages, or when the corpus mixes languages within the same index. If your traffic is multilingual, evaluate cross-lingual retrieval specifically — same-language performance numbers don't predict it.
+
+## Asymmetric Search: Queries vs Documents
+
+Queries and documents are not the same kind of text. A query is usually short, often phrased as a question or a handful of keywords; a document chunk is longer, declarative prose. Some embedding models are trained symmetrically, treating both the same way, while others are trained asymmetrically with separate encoding modes — a "query" mode and a "document" mode — because a short question and the long passage that answers it don't naturally look similar as raw text, even when one answers the other perfectly.
+
+Using the wrong mode is a subtle bug: retrieval still returns results, the scores still look like valid similarity scores, and nothing errors out — the ranking is just quietly worse than it should be. If a model's documentation distinguishes query and document embedding calls, use them as documented rather than treating the API as interchangeable.
+
+## Common Pitfalls
+
+Truncation silently drops content: every embedding model has a maximum input length, and text beyond it is either truncated or rejected depending on the API. If you embed a long chunk and only the first 200 tokens actually got encoded, you'll get plausible-looking but degraded vectors with no error raised.
+
+Re-embedding drift is another one — if you swap embedding models without re-embedding your entire existing index, old and new vectors live in different, incompatible spaces, and similarity scores between them are meaningless even though the numbers still look like valid floats.
+
+Whitespace and formatting noise is a smaller but real issue: markdown syntax, HTML tags, or repeated boilerplate headers left in a chunk before embedding add tokens that dilute the semantic signal without adding meaning. Stripping obvious formatting artifacts before embedding, rather than after, tends to produce measurably tighter clusters and better retrieval precision, especially on documentation-heavy corpora where every chunk repeats the same navigation text.
+
+## Takeaway
+
+An embedding is only useful insofar as its geometry reflects the semantic relationships you care about, and that geometry comes entirely from how the model was trained — not from the vector's dimensionality or the database that stores it. Pick a model validated against data like yours, keep query and document embedding paths identical, and treat re-embedding as a required step, not an optional one, whenever the model changes.

@@ -1,0 +1,86 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import ContentListItem from '../components/astro/ContentListItem.astro';
+import { ContentRepository } from '../lib/content';
+
+const suggestions = (await ContentRepository.all()).slice(0, 6);
+---
+
+<PageLayout title="Page not found" description="That page does not exist." noindex>
+  <div class="page">
+    <p class="code">404</p>
+    <h1>That page does not exist.</h1>
+    <p class="body">
+      The link may be out of date, or the note may have been renamed. Try searching, or start
+      from one of the recent entries below.
+    </p>
+
+    <div class="actions">
+      <button type="button" class="action" data-open-search>Search the site</button>
+      <a class="action" href="/">Go home</a>
+    </div>
+
+    <ul class="suggestions">
+      {suggestions.map((entry) => <ContentListItem entry={entry} showDate />)}
+    </ul>
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    max-width: 44rem;
+    padding-top: clamp(1rem, 6vw, 4rem);
+  }
+
+  .code {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 0.75rem;
+    letter-spacing: 0.2em;
+    color: var(--accent-rose);
+  }
+
+  h1 {
+    margin: 0.75rem 0 0;
+    font-size: clamp(1.75rem, 4vw, 2.5rem);
+    letter-spacing: -0.03em;
+    color: var(--text-primary);
+  }
+
+  .body {
+    margin: 0.85rem 0 0;
+    max-width: 52ch;
+    font-size: 1rem;
+    line-height: 1.7;
+    color: var(--text-secondary);
+  }
+
+  .actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .action {
+    padding: 0.45rem 0.9rem;
+    border: 1px solid var(--border-default);
+    border-radius: var(--radius-md);
+    background: var(--surface);
+    color: var(--text-primary);
+    font: inherit;
+    font-size: 0.875rem;
+    text-decoration: none;
+    cursor: pointer;
+  }
+  .action:hover {
+    border-color: var(--accent-blue);
+  }
+
+  .suggestions {
+    margin: 2.5rem 0 0;
+    padding: 0;
+    list-style: none;
+    border-top: 1px solid var(--border-subtle);
+  }
+</style>

@@ -1,0 +1,234 @@
+---
+import type { MarkdownHeading } from 'astro';
+import PageLayout from './PageLayout.astro';
+import ArticleNav from '../components/astro/ArticleNav.astro';
+import Breadcrumbs from '../components/astro/Breadcrumbs.astro';
+import DifficultyBadge from '../components/astro/DifficultyBadge.astro';
+import RelatedContent from '../components/astro/RelatedContent.astro';
+import TableOfContents from '../components/astro/TableOfContents.astro';
+import TopicBadge from '../components/astro/TopicBadge.astro';
+import BookmarkButton from '../components/react/BookmarkButton';
+import { ContentRepository, type ContentEntry } from '../lib/content';
+import { articleJsonLd, breadcrumbJsonLd, entryCrumbs } from '../lib/metadata';
+import { pillars } from '../data/topics';
+import { formatDate, isoDate, slugify } from '../lib/utils';
+
+interface Props {
+  entry: ContentEntry;
+  headings: MarkdownHeading[];
+  /** Deepest TOC level; system designs use 2 to keep it scannable. */
+  tocDepth?: number;
+}
+
+const { entry, headings, tocDepth = 3 } = Astro.props;
+
+const pillar = pillars[entry.pillar];
+const crumbs = entryCrumbs(entry);
+const [related, adjacent, cross] = await Promise.all([
+  ContentRepository.related(entry, 4),
+  ContentRepository.adjacent(entry),
+  ContentRepository.crossPillar(entry),
+]);
+const revised = entry.updatedAt.getTime() !== entry.publishedAt.getTime();
+---
+
+<PageLayout
+  title={entry.title}
+  description={entry.description}
+  type="article"
+  entry={entry}
+  pillarClass={pillar.accentClass}
+  jsonLd={[articleJsonLd(entry), breadcrumbJsonLd(crumbs)]}
+>
+  <article class="article">
+    <header class="article-head">
+      <Breadcrumbs crumbs={crumbs} />
+
+      <h1>{entry.title}</h1>
+      <p class="article-lede">{entry.description}</p>
+
+      <slot name="header-extra" />
+
+      <div class="article-meta">
+        <ul class="article-tags">
+          {
+            entry.tags.map((tag) => (
+              <li>
+                <TopicBadge tag={tag} href={`${pillar.href}?tag=${slugify(tag)}`} />
+              </li>
+            ))
+          }
+        </ul>
+
+        <div class="article-facts">
+          <DifficultyBadge difficulty={entry.difficulty} />
+          <span class="fact-dot" aria-hidden="true"></span>
+          <span class="fact">{entry.readingTime} min read</span>
+          <span class="fact-dot" aria-hidden="true"></span>
+          <span class="fact">
+            {revised ? 'Updated' : 'Published'}
+            <time datetime={isoDate(entry.updatedAt)}>{formatDate(entry.updatedAt)}</time>
+          </span>
+          <BookmarkButton client:visible id={entry.id} title={entry.title} />
+        </div>
+      </div>
+    </header>
+
+    <div class="article-body">
+      <div class="prose">
+        <slot />
+      </div>
+
+      <aside class="article-aside">
+        <div class="aside-sticky">
+          <TableOfContents headings={headings} maxDepth={tocDepth} />
+          <slot name="aside-extra" />
+        </div>
+      </aside>
+    </div>
+
+    <div class="article-foot">
+      <RelatedContent entries={related} />
+      <ArticleNav prev={adjacent.prev} next={adjacent.next} cross={cross} />
+    </div>
+  </article>
+
+  <script>
+    /**
+     * Adds a permalink affordance to every article heading. Done at
+     * runtime rather than through a markdown plugin so the content
+     * pipeline stays swappable.
+     */
+    document
+      .querySelectorAll<HTMLHeadingElement>('.prose h2[id], .prose h3[id], .prose h4[id]')
+      .forEach((heading) => {
+        const anchor = document.createElement('a');
+        anchor.className = 'heading-anchor';
+        anchor.href = `#${heading.id}`;
+        anchor.textContent = '#';
+        anchor.setAttribute('aria-label', `Link to section: ${heading.textContent ?? ''}`);
+        heading.append(anchor);
+      });
+  </script>
+</PageLayout>
+
+<style>
+  .article {
+    padding-bottom: 1rem;
+  }
+
+  .article-head {
+    max-width: var(--prose-max);
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid var(--border-subtle);
+  }
+
+  h1 {
+    margin: 1rem 0 0;
+    font-size: clamp(1.875rem, 4.5vw, 2.75rem);
+    font-weight: 700;
+    letter-spacing: -0.035em;
+    line-height: 1.1;
+    color: var(--text-primary);
+  }
+
+  .article-lede {
+    margin: 0.85rem 0 0;
+    font-size: clamp(1rem, 1.6vw, 1.125rem);
+    line-height: 1.6;
+    color: var(--text-secondary);
+    max-width: 58ch;
+  }
+
+  .article-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 0.85rem;
+    margin-top: 1.5rem;
+  }
+
+  .article-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .article-facts {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 0.6rem;
+  }
+
+  .fact {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+
+  .fact-dot {
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: var(--border-strong);
+  }
+
+  .article-facts :global(.bookmark-btn) {
+    margin-left: auto;
+  }
+
+  .article-body {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 15rem);
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+    align-items: start;
+    padding-top: 2rem;
+  }
+
+  .article-aside {
+    position: relative;
+    /* Stretch to the row height so `position: sticky` has somewhere
+       to travel for the whole length of the article. */
+    align-self: stretch;
+  }
+
+  .aside-sticky {
+    position: sticky;
+    top: calc(var(--header-height) + 1.5rem);
+    max-height: calc(100dvh - var(--header-height) - 3rem);
+    overflow-y: auto;
+    display: grid;
+    gap: 1.5rem;
+  }
+
+  .article-foot {
+    max-width: var(--prose-max);
+  }
+
+  @media (max-width: 68rem) {
+    .article-body {
+      grid-template-columns: 1fr;
+    }
+
+    /* On narrow screens the TOC becomes a collapsed strip above the
+       article rather than a rail beside it. */
+    .article-aside {
+      order: -1;
+    }
+
+    .aside-sticky {
+      position: static;
+      max-height: none;
+      padding: 0.9rem 1rem;
+      border: 1px solid var(--border-subtle);
+      border-radius: var(--radius-lg);
+      background: var(--surface);
+    }
+  }
+</style>

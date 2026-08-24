@@ -1,0 +1,140 @@
+---
+import PageLayout from '../layouts/PageLayout.astro';
+import SectionHeader from '../components/astro/SectionHeader.astro';
+import ContentCard from '../components/astro/ContentCard.astro';
+import BookmarkList from '../components/react/BookmarkList';
+import { ContentRepository } from '../lib/content';
+import { pillars } from '../data/topics';
+
+// Every article is rendered up front and hidden; the island reveals
+// the saved ones. Nothing about the reader's list reaches the server.
+const entries = await ContentRepository.all();
+---
+
+<PageLayout
+  title="Bookmarks"
+  description="Articles you have saved. Stored in this browser only."
+  noindex
+>
+  <div class="page">
+    <SectionHeader
+      level="page"
+      eyebrow="Saved for later"
+      title="Bookmarks"
+      description="Your reading list, kept in this browser's local storage. Nothing is sent anywhere, and clearing site data clears the list."
+    />
+
+    <BookmarkList client:load total={entries.length} />
+
+    <ul class="grid" data-bookmarks-grid hidden>
+      {
+        entries.map((entry) => (
+          <li
+            class={pillars[entry.pillar].accentClass}
+            data-entry
+            data-entry-id={entry.id}
+            hidden
+          >
+            <ContentCard entry={entry} showPillar />
+          </li>
+        ))
+      }
+    </ul>
+
+    <div class="empty" data-bookmarks-empty>
+      <p class="empty-title">No bookmarks yet.</p>
+      <p class="empty-body">
+        Open any article and press <strong>Save</strong> in the header. Saved articles show up here
+        on this device.
+      </p>
+      <div class="empty-actions">
+        {
+          Object.values(pillars).map((pillar) => (
+            <a class={`empty-link ${pillar.accentClass}`} href={pillar.href}>
+              Browse {pillar.label}
+            </a>
+          ))
+        }
+      </div>
+    </div>
+  </div>
+</PageLayout>
+
+<style>
+  .page {
+    display: grid;
+    gap: 1.75rem;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .grid > li {
+    min-width: 0;
+  }
+
+  .empty {
+    padding: 3rem 1.5rem;
+    text-align: center;
+    border: 1px dashed var(--border-default);
+    border-radius: var(--radius-lg);
+  }
+
+  .empty-title {
+    margin: 0;
+    font-size: 1.0625rem;
+    font-weight: 600;
+    color: var(--text-primary);
+  }
+
+  .empty-body {
+    margin: 0.5rem auto 0;
+    max-width: 42ch;
+    font-size: 0.9375rem;
+    line-height: 1.6;
+    color: var(--text-muted);
+  }
+
+  .empty-actions {
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 1.5rem;
+  }
+
+  .empty-link {
+    padding: 0.35rem 0.8rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+    font-size: 0.8125rem;
+    color: var(--text-secondary);
+    text-decoration: none;
+    transition:
+      color var(--dur-fast) var(--ease-out),
+      border-color var(--dur-fast) var(--ease-out);
+  }
+  .empty-link:hover {
+    color: var(--pillar);
+    border-color: color-mix(in oklab, var(--pillar) 45%, transparent);
+  }
+
+  @media (max-width: 64rem) {
+    .grid {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+  }
+
+  @media (max-width: 40rem) {
+    .grid {
+      grid-template-columns: 1fr;
+    }
+  }
+</style>
