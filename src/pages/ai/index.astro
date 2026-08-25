@@ -16,11 +16,7 @@ const pillar = pillars.ai;
   jsonLd={[breadcrumbJsonLd([{ label: 'Home', href: '/' }, { label: pillar.label }])]}
 >
   <div class="page">
-    <SectionHeader
-      level="page"
-      title={pillar.label}
-      description={pillar.heroDescription}
-    />
+    <SectionHeader level="page" title={pillar.label} description={pillar.heroDescription} />
     <ContentLibrary
       pillar="ai"
       layout="grouped"

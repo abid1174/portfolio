@@ -1,8 +1,7 @@
 ---
 import HeroVisual from './HeroVisual.astro';
 import StatGrid from './StatGrid.astro';
-import { ArrowRight, Command } from 'lucide-react';
-import { site } from '../../data/site';
+import { ArrowRight } from 'lucide-react';
 import type { ContentStats } from '../../lib/content';
 
 interface Props {
@@ -14,32 +13,24 @@ const { stats } = Astro.props;
 // Every figure is derived from the content collections — adding an
 // article updates the hero with no code change.
 const figures = [
-  { value: String(stats.concepts), label: 'Concepts', accent: 'var(--accent-emerald)' },
+  { value: String(stats.concepts), label: 'Concepts', accent: 'var(--accent-ochre)' },
   {
     value: String(stats.systemDesigns),
     label: 'System Designs',
-    accent: 'var(--accent-lime)',
+    accent: 'var(--accent-blue)',
   },
   {
     value: String(stats.practices),
     label: 'Engineering Practices',
     accent: 'var(--border-strong)',
   },
-  { value: String(stats.ai), label: 'AI Notes', accent: 'var(--accent-teal)' },
+  { value: String(stats.ai), label: 'AI Notes', accent: 'var(--accent-green)' },
 ];
 ---
 
 <section class="hero" aria-labelledby="hero-title">
-  <div class="aurora" aria-hidden="true"></div>
-  <div class="hero-grid grid-backdrop" aria-hidden="true"></div>
-
   <div class="hero-inner">
     <div class="hero-copy">
-      <p class="hero-eyebrow">
-        <span class="dot" aria-hidden="true"></span>
-        Engineering notes · {site.role}
-      </p>
-
       <h1 id="hero-title">
         <span class="line">Clear concepts.</span>
         <span class="line">Scalable systems.</span>
@@ -57,11 +48,6 @@ const figures = [
           <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
         </a>
         <a class="btn btn-outline" href="/system-design">Read a system design</a>
-        <p class="hero-hint">
-          <span>or press</span>
-          <kbd><Command size={10} strokeWidth={2.5} aria-hidden="true" />K</kbd>
-          <span>to search</span>
-        </p>
       </div>
     </div>
 
@@ -78,56 +64,8 @@ const figures = [
 <style>
   .hero {
     position: relative;
-    overflow: hidden;
-    border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
-    background: var(--bg-secondary);
-    padding: clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 4vw, 2.5rem);
-  }
-
-  /* Mesh of soft green light rather than a flat linear gradient —
-     three offset radials that drift slowly against each other. */
-  .aurora {
-    position: absolute;
-    inset: -30% -10%;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        32% 40% at 18% 34%,
-        color-mix(in oklab, var(--accent-emerald) 30%, transparent),
-        transparent 68%
-      ),
-      radial-gradient(
-        28% 34% at 72% 18%,
-        color-mix(in oklab, var(--accent-teal) 24%, transparent),
-        transparent 70%
-      ),
-      radial-gradient(
-        26% 30% at 52% 74%,
-        color-mix(in oklab, var(--accent-lime) 18%, transparent),
-        transparent 72%
-      );
-    filter: blur(64px);
-    opacity: 0.9;
-    animation: drift 28s var(--ease-out) infinite alternate;
-  }
-
-  @keyframes drift {
-    from {
-      transform: translate3d(-2%, -1%, 0) scale(1);
-    }
-    to {
-      transform: translate3d(3%, 2%, 0) scale(1.08);
-    }
-  }
-
-  .hero-grid {
-    position: absolute;
-    inset: 0;
-    opacity: 0.4;
-    /* Fades out toward the copy so text never fights the grid. */
-    mask-image: radial-gradient(80% 60% at 78% 30%, #000 0%, transparent 75%);
-    pointer-events: none;
+    border-bottom: 1px solid var(--border-subtle);
+    padding: clamp(1.25rem, 3vw, 2.5rem) 0 clamp(1.75rem, 4vw, 3rem);
   }
 
   /* Deliberately off-balance: the copy gets the wide column and the
@@ -144,36 +82,6 @@ const figures = [
     padding-top: clamp(0.5rem, 2vw, 1.75rem);
   }
 
-  .hero-eyebrow {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0 0 1.25rem;
-    font-family: var(--font-mono);
-    font-size: var(--text-xs);
-    letter-spacing: 0.02em;
-    color: var(--text-secondary);
-  }
-
-  .dot {
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent-emerald);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-emerald) 18%, transparent);
-    animation: pulse 3.2s ease-in-out infinite;
-  }
-
-  @keyframes pulse {
-    0%,
-    100% {
-      box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-emerald) 18%, transparent);
-    }
-    50% {
-      box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent-emerald) 6%, transparent);
-    }
-  }
-
   h1 {
     margin: 0;
     font-size: var(--text-display);
@@ -187,18 +95,10 @@ const figures = [
     color: var(--text-primary);
   }
 
-  /* Only the third line takes the gradient — restraint keeps it
-     reading as a publication, not a landing page. */
+  /* Only the third line takes the accent colour — a single flat
+     tint, which is all the emphasis this needs. */
   .line-accent {
-    background: linear-gradient(
-      100deg,
-      var(--accent-emerald) 0%,
-      var(--accent-teal) 48%,
-      var(--accent-lime) 100%
-    );
-    -webkit-background-clip: text;
-    background-clip: text;
-    color: transparent;
+    color: var(--accent-ochre);
   }
 
   .hero-lede {
@@ -217,35 +117,12 @@ const figures = [
     margin-top: 2rem;
   }
 
-  .hero-hint {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35rem;
-    margin: 0;
-    font-size: var(--text-xs);
-    color: var(--text-muted);
-  }
-
-  kbd {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.1rem;
-    padding: 0.1rem 0.32rem;
-    border: 1px solid var(--border-default);
-    border-radius: var(--radius-sm);
-    background: var(--surface-inset);
-    font-family: var(--font-mono);
-    font-size: var(--text-2xs);
-    color: var(--text-secondary);
-  }
-
   .hero-stats {
     position: relative;
     margin-top: clamp(2rem, 5vw, 3rem);
   }
 
   /* Staggered entry: nothing mounts all at once. */
-  .hero-eyebrow,
   .line,
   .hero-lede,
   .hero-actions,
@@ -295,26 +172,15 @@ const figures = [
       display: flex;
       justify-content: center;
     }
-    .hero-grid {
-      mask-image: radial-gradient(90% 40% at 50% 12%, #000 0%, transparent 78%);
-    }
   }
 
   @media (max-width: 40rem) {
     .hero-visual {
       display: none;
     }
-    .hero-hint {
-      display: none;
-    }
   }
 
   @media (prefers-reduced-motion: reduce) {
-    .aurora,
-    .dot {
-      animation: none;
-    }
-    .hero-eyebrow,
     .line,
     .hero-lede,
     .hero-actions,

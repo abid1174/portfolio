@@ -10,16 +10,16 @@
   <svg viewBox="0 0 340 300" fill="none" preserveAspectRatio="xMidYMid meet">
     <defs>
       <linearGradient id="hv-emerald" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="var(--accent-emerald)" stop-opacity="0.9"></stop>
-        <stop offset="100%" stop-color="var(--accent-emerald)" stop-opacity="0.25"></stop>
+        <stop offset="0%" stop-color="var(--accent-ochre)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-ochre)" stop-opacity="0.25"></stop>
       </linearGradient>
       <linearGradient id="hv-lime" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="var(--accent-lime)" stop-opacity="0.9"></stop>
-        <stop offset="100%" stop-color="var(--accent-lime)" stop-opacity="0.25"></stop>
+        <stop offset="0%" stop-color="var(--accent-blue)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-blue)" stop-opacity="0.25"></stop>
       </linearGradient>
       <linearGradient id="hv-teal" x1="0" y1="0" x2="1" y2="1">
-        <stop offset="0%" stop-color="var(--accent-teal)" stop-opacity="0.9"></stop>
-        <stop offset="100%" stop-color="var(--accent-teal)" stop-opacity="0.25"></stop>
+        <stop offset="0%" stop-color="var(--accent-green)" stop-opacity="0.9"></stop>
+        <stop offset="100%" stop-color="var(--accent-green)" stop-opacity="0.25"></stop>
       </linearGradient>
     </defs>
 
@@ -94,19 +94,6 @@
     margin-inline: auto;
   }
 
-  .visual::before {
-    content: '';
-    position: absolute;
-    inset: 12% 8%;
-    background: radial-gradient(
-      50% 50% at 50% 50%,
-      color-mix(in oklab, var(--accent-emerald) 18%, transparent),
-      transparent 72%
-    );
-    filter: blur(28px);
-    pointer-events: none;
-  }
-
   svg {
     position: relative;
     display: block;
@@ -156,7 +143,7 @@
   }
 
   .chip-label {
-    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 9px;
     letter-spacing: 0.1em;
     text-transform: uppercase;
@@ -170,20 +157,20 @@
   }
 
   .chip-sub {
-    font-family: var(--font-geist-mono), ui-monospace, monospace;
+    font-family: var(--font-mono);
     font-size: 7.5px;
     letter-spacing: 0.08em;
     fill: var(--text-muted);
   }
 
   .leaf.emerald {
-    fill: var(--accent-emerald);
+    fill: var(--accent-ochre);
   }
   .leaf.lime {
-    fill: var(--accent-lime);
+    fill: var(--accent-blue);
   }
   .leaf.teal {
-    fill: var(--accent-teal);
+    fill: var(--accent-green);
   }
   .leaf {
     opacity: 0.85;

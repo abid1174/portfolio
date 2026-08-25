@@ -15,9 +15,7 @@ const diagram = (entry.diagram ?? 'mesh') as
   'fanout' | 'keyvalue' | 'realtime' | 'pipeline' | 'storage' | 'mesh';
 ---
 
-<article
-  class:list={['card card-interactive ticked sd-card pillar-system-design', `is-${variant}`]}
->
+<article class:list={['card card-interactive sd-card pillar-system-design', `is-${variant}`]}>
   {
     variant === 'feature' && (
       <div class="sd-thumb">
@@ -55,7 +53,7 @@ const diagram = (entry.diagram ?? 'mesh') as
   .sd-thumb {
     position: relative;
     padding: 0.75rem 0.75rem 0;
-    background: linear-gradient(to bottom, var(--pillar-wash), transparent 85%);
+    background: var(--pillar-wash);
     border-bottom: 1px solid var(--border-subtle);
   }
 

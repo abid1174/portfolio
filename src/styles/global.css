@@ -25,9 +25,9 @@
   --color-muted: var(--text-muted);
   --color-inverted: var(--text-inverted);
 
-  --color-emerald: var(--accent-emerald);
-  --color-lime: var(--accent-lime);
-  --color-teal: var(--accent-teal);
+  --color-ochre: var(--accent-ochre);
+  --color-blue: var(--accent-blue);
+  --color-green: var(--accent-green);
   --color-amber: var(--accent-amber);
   --color-rose: var(--accent-rose);
   --color-pillar: var(--pillar);
@@ -40,9 +40,9 @@
   --radius-lg: var(--radius-lg);
   --radius-xl: var(--radius-xl);
 
-  --font-sans: var(--font-geist), ui-sans-serif, system-ui, sans-serif;
-  --font-display: var(--font-display), var(--font-geist), ui-sans-serif, sans-serif;
-  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-ui);
+  --font-display: var(--font-heading);
+  --font-mono: var(--font-code);
 
   --ease-out: var(--ease-out);
 }
@@ -75,9 +75,7 @@
     line-height: var(--leading-body);
     letter-spacing: var(--tracking-normal);
     /* Contextual alternates + real fractions where the face has them. */
-    font-feature-settings:
-      'calt' 1,
-      'ss01' 1;
+    font-feature-settings: 'calt' 1;
   }
 
   /* Display face for headings; tracking tightens as size grows. */
@@ -92,6 +90,11 @@
     letter-spacing: var(--tracking-tight);
     line-height: var(--leading-tight);
     text-wrap: balance;
+  }
+
+  h1,
+  h2 {
+    font-weight: 700;
   }
 
   h1 {
@@ -183,125 +186,35 @@
     color: var(--text-muted);
   }
 
-  /* Card shell: hairline border over a surface that lifts very
-     slightly toward the top edge, so cards read as lit from above
-     rather than as flat rectangles. */
+  /* Card shell: a flat surface inside a hairline border. Depth comes
+     from the border and the surface step alone — no gradient lift,
+     no shadow at rest. */
   .card {
     position: relative;
     isolation: isolate;
-    background:
-      linear-gradient(
-        180deg,
-        color-mix(in oklab, var(--text-primary) 3%, transparent),
-        transparent 40%
-      ),
-      var(--surface);
+    background: var(--surface);
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
     transition:
       border-color var(--dur-base) var(--ease-out),
-      background-color var(--dur-base) var(--ease-out),
-      box-shadow var(--dur-base) var(--ease-out),
-      transform var(--dur-base) var(--ease-out);
+      background-color var(--dur-base) var(--ease-out);
   }
 
-  /* Spotlight border: the card edge brightens where the pointer is.
-     `--mx/--my` are set by the pointer script in BaseLayout; with no
-     JS the gradient simply sits at the card's centre. */
-  .card-interactive::before {
-    content: '';
-    position: absolute;
-    inset: -1px;
-    z-index: -1;
-    border-radius: inherit;
-    padding: 1px;
-    background: radial-gradient(
-      14rem 14rem at var(--mx, 50%) var(--my, 0%),
-      color-mix(in oklab, var(--pillar) 55%, transparent),
-      transparent 70%
-    );
-    -webkit-mask:
-      linear-gradient(#000 0 0) content-box,
-      linear-gradient(#000 0 0);
-    -webkit-mask-composite: xor;
-    mask-composite: exclude;
-    opacity: 0;
-    transition: opacity var(--dur-base) var(--ease-out);
-    pointer-events: none;
-  }
-
+  /* Hover is a quiet border-and-surface change. Nothing lifts, glows
+     or scales: on a paper-coloured page that reads as noise. */
   .card-interactive:hover {
     background: var(--surface-hover);
-    border-color: color-mix(in oklab, var(--pillar) 22%, var(--border-default));
-    transform: translateY(-3px);
-    box-shadow: var(--shadow-md);
-  }
-
-  .card-interactive:hover::before,
-  .card-interactive:focus-within::before {
-    opacity: 1;
+    border-color: var(--border-strong);
   }
 
   .card-interactive:focus-within {
     border-color: var(--pillar);
   }
 
-  /* Pressing a card should feel like pressing something physical. */
-  .card-interactive:active {
-    transform: translateY(-1px) scale(0.995);
-  }
-
-  /* Schematic corner ticks — the blueprint motif, drawn with
-     gradients so they cost no extra DOM. */
-  .ticked::before,
-  .ticked::after {
-    content: '';
-    position: absolute;
-    width: 9px;
-    height: 9px;
-    opacity: 0;
-    transition: opacity var(--dur-base) var(--ease-out);
-    pointer-events: none;
-  }
-  .ticked::before {
-    top: -1px;
-    left: -1px;
-    border-top: 1px solid var(--pillar);
-    border-left: 1px solid var(--pillar);
-    border-top-left-radius: var(--radius-lg);
-  }
-  .ticked::after {
-    bottom: -1px;
-    right: -1px;
-    border-bottom: 1px solid var(--pillar);
-    border-right: 1px solid var(--pillar);
-    border-bottom-right-radius: var(--radius-lg);
-  }
-  .ticked:hover::before,
-  .ticked:hover::after,
-  .ticked:focus-within::before,
-  .ticked:focus-within::after {
-    opacity: 1;
-  }
-
-  /* Blueprint grid used sparingly (hero, section dividers). */
-  .grid-backdrop {
-    background-image:
-      linear-gradient(to right, var(--border-subtle) 1px, transparent 1px),
-      linear-gradient(to bottom, var(--border-subtle) 1px, transparent 1px);
-    background-size: 56px 56px;
-  }
-
-  /* Full-bleed hairline that fades at both ends. */
+  /* Full-bleed hairline. */
   .rule-fade {
     height: 1px;
-    background: linear-gradient(
-      to right,
-      transparent,
-      var(--border-default) 12%,
-      var(--border-default) 88%,
-      transparent
-    );
+    background: var(--border-subtle);
   }
 
   .link-underline {
@@ -347,24 +260,23 @@
       transform var(--dur-fast) var(--ease-out);
   }
 
-  /* Physical press feedback on every button variant. */
+  /* Press feedback, kept to a single pixel of travel. */
   .btn:active {
-    transform: translateY(1px) scale(0.985);
+    transform: translateY(1px);
   }
 
   .btn-primary {
     background: var(--pillar);
     color: var(--text-inverted);
-    box-shadow: var(--glow-pillar);
   }
   .btn-primary:hover {
-    background: color-mix(in oklab, var(--pillar) 88%, var(--text-primary));
+    background: var(--pillar-dim);
   }
   .btn-primary svg {
     transition: transform var(--dur-base) var(--ease-out);
   }
   .btn-primary:hover svg {
-    transform: translateX(3px);
+    transform: translateX(2px);
   }
 
   .btn-outline {
@@ -374,7 +286,7 @@
   }
   .btn-outline:hover {
     color: var(--text-primary);
-    border-color: color-mix(in oklab, var(--pillar) 40%, var(--border-strong));
+    border-color: var(--border-strong);
     background: var(--surface-hover);
   }
 
@@ -384,24 +296,7 @@
     background: none;
   }
   .btn-quiet:hover {
-    color: var(--pillar);
-  }
-
-  /* --- Film grain. Breaks the flatness of large dark surfaces;
-         fixed, non-interactive, and invisible to assistive tech. --- */
-  .grain {
-    position: fixed;
-    inset: 0;
-    z-index: var(--z-grain);
-    pointer-events: none;
-    opacity: 0.035;
-    mix-blend-mode: overlay;
-    background-image: var(--grain-url);
-    background-size: 180px 180px;
-  }
-  :root[data-theme='light'] .grain {
-    opacity: 0.04;
-    mix-blend-mode: multiply;
+    color: var(--text-primary);
   }
 }
 
@@ -434,19 +329,19 @@
 }
 
 .prose h2 {
-  margin-top: 2.75em;
-  font-size: 1.5rem;
-  padding-bottom: 0.5rem;
+  margin-top: 2.5em;
+  font-size: 1.6rem;
+  padding-bottom: 0.45rem;
   border-bottom: 1px solid var(--border-subtle);
 }
 
 .prose h3 {
-  margin-top: 2em;
-  font-size: 1.1875rem;
+  margin-top: 2.1em;
+  font-size: 1.3rem;
 }
 
 .prose h4 {
-  margin-top: 1.75em;
+  margin-top: 1.9em;
   font-size: 1.0625rem;
 }
 
@@ -498,7 +393,7 @@
   width: 5px;
   height: 5px;
   border-radius: 1px;
-  background: color-mix(in oklab, var(--pillar) 70%, transparent);
+  background: var(--border-strong);
 }
 .prose ol {
   list-style: decimal;
@@ -517,8 +412,10 @@
 }
 
 .prose blockquote {
-  border-left: 2px solid var(--pillar);
-  padding-left: 1.15em;
+  border-left: 3px solid var(--pillar);
+  background: var(--surface-inset);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+  padding: 0.9em 1.15em;
   color: var(--text-secondary);
   font-style: normal;
 }
@@ -562,10 +459,10 @@
   font-size: inherit;
 }
 
-/* Shiki emits a light-theme variant we swap to under light mode. */
-:root[data-theme='light'] .prose .astro-code,
-:root[data-theme='light'] .prose .astro-code span {
-  color: var(--shiki-light, inherit) !important;
+/* Shiki emits a dark-theme variant we swap to under dark mode. */
+:root[data-theme='dark'] .prose .astro-code,
+:root[data-theme='dark'] .prose .astro-code span {
+  color: var(--shiki-dark, inherit) !important;
   background-color: transparent !important;
 }
 
@@ -647,8 +544,5 @@
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
     scroll-behavior: auto !important;
-  }
-  .card-interactive:hover {
-    transform: none;
   }
 }

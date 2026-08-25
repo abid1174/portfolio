@@ -11,9 +11,6 @@ const { stats } = Astro.props;
 ---
 
 <section class="cta" aria-labelledby="cta-title">
-  <div class="cta-grid grid-backdrop" aria-hidden="true"></div>
-  <div class="cta-wash" aria-hidden="true"></div>
-
   <div class="cta-inner">
     <p class="label-mono cta-eyebrow">Why this exists</p>
     <h2 id="cta-title"><span class="quote-mark" aria-hidden="true">“</span>{site.manifesto}</h2>
@@ -39,39 +36,10 @@ const { stats } = Astro.props;
 <style>
   .cta {
     position: relative;
-    overflow: hidden;
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-xl);
+    border-radius: var(--radius-lg);
     background: var(--bg-secondary);
-    padding: clamp(1.75rem, 4vw, 3rem);
-  }
-
-  .cta-grid {
-    position: absolute;
-    inset: 0;
-    opacity: 0.3;
-    mask-image: linear-gradient(to left, #000, transparent 55%);
-    pointer-events: none;
-  }
-
-  /* Ambient light from the right, so the space beside the quote reads
-     as deliberate rather than as an empty half. */
-  .cta-wash {
-    position: absolute;
-    inset: -40% -20% -40% 30%;
-    background:
-      radial-gradient(
-        38% 46% at 72% 42%,
-        color-mix(in oklab, var(--accent-teal) 22%, transparent),
-        transparent 70%
-      ),
-      radial-gradient(
-        30% 40% at 92% 78%,
-        color-mix(in oklab, var(--accent-emerald) 18%, transparent),
-        transparent 72%
-      );
-    filter: blur(60px);
-    pointer-events: none;
+    padding: clamp(1.75rem, 4vw, 2.5rem);
   }
 
   .cta-inner {
@@ -81,7 +49,7 @@ const { stats } = Astro.props;
 
   .cta-eyebrow {
     margin: 0 0 1rem;
-    color: var(--accent-teal);
+    color: var(--accent-green);
   }
 
   h2 {
@@ -102,7 +70,7 @@ const { stats } = Astro.props;
     top: -0.06em;
     font-size: 1.6em;
     line-height: 1;
-    color: color-mix(in oklab, var(--accent-emerald) 45%, transparent);
+    color: color-mix(in oklab, var(--accent-ochre) 45%, transparent);
   }
 
   .cta-body {
@@ -130,7 +98,7 @@ const { stats } = Astro.props;
     transition: color var(--dur-fast) var(--ease-out);
   }
   .cta-link:hover {
-    color: var(--accent-emerald);
+    color: var(--accent-ochre);
   }
 
   @media (max-width: 48rem) {

@@ -11,41 +11,41 @@ function themeVariables() {
   const token = (name: string, fallback: string) =>
     css.getPropertyValue(name).trim() || fallback;
 
-  const line = token('--border-strong', '#2d4137');
-  const text = token('--text-primary', '#e8f2ec');
-  const surface = token('--surface-raised', '#0f1814');
-  const accent = token('--pillar', '#4fd493');
+  const line = token('--border-strong', '#c6b894');
+  const text = token('--text-primary', '#26241f');
+  const surface = token('--surface-raised', '#fffdf7');
+  const accent = token('--pillar', '#9c5f21');
 
   return {
     background: 'transparent',
     primaryColor: surface,
     primaryTextColor: text,
     primaryBorderColor: accent,
-    secondaryColor: token('--surface-inset', '#08110d'),
+    secondaryColor: token('--surface-inset', '#f3ecdb'),
     tertiaryColor: surface,
     lineColor: line,
-    textColor: token('--text-secondary', '#a2b6ab'),
+    textColor: token('--text-secondary', '#55514a'),
     mainBkg: surface,
     nodeBorder: accent,
     clusterBkg: 'transparent',
     clusterBorder: line,
-    edgeLabelBackground: token('--bg-primary', '#050908'),
-    fontFamily: token('--font-geist-mono', 'ui-monospace') + ', ui-monospace, monospace',
+    edgeLabelBackground: token('--bg-primary', '#faf6ec'),
+    fontFamily: token('--font-mono', 'ui-monospace') + ', ui-monospace, monospace',
     fontSize: '14px',
     actorBkg: surface,
     actorBorder: accent,
     actorTextColor: text,
     actorLineColor: line,
-    signalColor: token('--text-secondary', '#a2b6ab'),
+    signalColor: token('--text-secondary', '#55514a'),
     signalTextColor: text,
     labelBoxBkgColor: surface,
     labelBoxBorderColor: line,
     labelTextColor: text,
     loopTextColor: text,
-    noteBkgColor: token('--surface-inset', '#08110d'),
+    noteBkgColor: token('--surface-inset', '#f3ecdb'),
     noteBorderColor: line,
     noteTextColor: text,
-    sequenceNumberColor: token('--text-inverted', '#04120b'),
+    sequenceNumberColor: token('--text-inverted', '#fffdf7'),
   };
 }
 

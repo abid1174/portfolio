@@ -1,5 +1,5 @@
 // @ts-check
-import { defineConfig, fontProviders } from 'astro/config';
+import { defineConfig } from 'astro/config';
 import react from '@astrojs/react';
 import mdx from '@astrojs/mdx';
 import sitemap from '@astrojs/sitemap';
@@ -18,54 +18,20 @@ export default defineConfig({
   markdown: {
     syntaxHighlight: 'shiki',
     shikiConfig: {
-      // Everforest is a green-based syntax palette, so code blocks sit
-      // in the same colour family as the rest of the site. Both themes
-      // are emitted; global.css swaps to the light one under
-      // `[data-theme='light']`.
+      // Solarized is the warm, low-contrast pair that sits closest to
+      // the cream/charcoal palette — code blocks read as part of the
+      // page rather than as a pasted-in terminal. Both themes are
+      // emitted; global.css swaps to the dark one under
+      // `[data-theme='dark']`.
       themes: {
-        dark: 'everforest-dark',
-        light: 'everforest-light',
+        light: 'solarized-light',
+        dark: 'solarized-dark',
       },
-      // Dark is what ships inline; light lives in `--shiki-light`.
-      defaultColor: 'dark',
+      // Light is what ships inline; dark lives in `--shiki-dark`.
+      defaultColor: 'light',
       wrap: false,
     },
   },
-  fonts: [
-    // Body / UI. Geist has more character than the default Inter
-    // without giving up long-form legibility.
-    {
-      provider: fontProviders.google(),
-      name: 'Geist',
-      cssVariable: '--font-geist',
-      weights: [400, 500, 600, 700],
-      styles: ['normal'],
-      subsets: ['latin'],
-      fallbacks: ['ui-sans-serif', 'system-ui', 'sans-serif'],
-    },
-    // Display. Space Grotesk gives headings a drafted, technical
-    // presence that matches the schematic motifs.
-    {
-      provider: fontProviders.google(),
-      name: 'Space Grotesk',
-      cssVariable: '--font-display',
-      weights: [500, 600, 700],
-      styles: ['normal'],
-      subsets: ['latin'],
-      fallbacks: ['Geist', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-    },
-    // Mono. Geist Mono keeps code and metadata labels in the same
-    // family as the body text.
-    {
-      provider: fontProviders.google(),
-      name: 'Geist Mono',
-      cssVariable: '--font-geist-mono',
-      weights: [400, 500, 600],
-      styles: ['normal'],
-      subsets: ['latin'],
-      fallbacks: ['ui-monospace', 'SFMono-Regular', 'monospace'],
-    },
-  ],
   vite: {
     plugins: [tailwindcss()],
     optimizeDeps: {

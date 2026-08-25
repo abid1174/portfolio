@@ -3,72 +3,92 @@
    radius, elevation and motion. Components must never inline
    raw colour values; always reference a token.
 
-   Palette: "verdant" — green-tinted neutrals under an emerald
-   primary, with lime and teal as the two supporting accents.
-   Every neutral carries a trace of green so surfaces, borders
-   and text sit in the same family as the accents.
+   Palette: "paper" — a warm cream ground under near-black ink,
+   with a muted ochre primary and two low-saturation supports.
+   Nothing here is fully saturated and nothing is pure white or
+   pure black: the whole range sits a few steps inside the gamut
+   so long reading sessions stay comfortable.
+
+   Light is the primary theme; dark is a warm charcoal companion
+   that keeps the same hue family rather than going blue-grey.
    ============================================================ */
 
 :root {
-  /* --- Surfaces (dark is the primary theme) --- */
-  --bg-primary: #050908;
-  --bg-secondary: #080e0b;
-  --surface: #0c1410;
-  --surface-hover: #121c17;
-  --surface-raised: #0f1814;
-  --surface-inset: #08110d;
+  /* --- Typeface stacks. The system UI faces first, so on Apple
+         hardware the site renders in SF Pro and costs no request;
+         everywhere else it falls through to the platform's own
+         UI face before touching a web-safe fallback. --- */
+  --font-ui:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Text', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-heading:
+    -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'Segoe UI', Roboto, Helvetica, Arial,
+    sans-serif;
+  --font-code:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+
+  /* --- Surfaces --- */
+  --bg-primary: #faf6ec;
+  --bg-secondary: #f4eedd;
+  --surface: #fffdf7;
+  --surface-hover: #f6f0e1;
+  --surface-raised: #fffdf7;
+  --surface-inset: #f3ecdb;
 
   /* --- Lines --- */
-  --border-subtle: #16221c;
-  --border-default: #1f2f27;
-  --border-strong: #2d4137;
+  --border-subtle: #eae1cb;
+  --border-default: #ddd2b6;
+  --border-strong: #c6b894;
 
   /* --- Text --- */
-  --text-primary: #e8f2ec;
-  --text-secondary: #a2b6ab;
-  --text-muted: #6b8076;
-  --text-inverted: #04120b;
+  --text-primary: #26241f;
+  --text-secondary: #55514a;
+  --text-muted: #837d71;
+  --text-inverted: #fffdf7;
 
-  /* --- Accents --- */
-  --accent-emerald: #4fd493;
-  --accent-emerald-dim: #27a875;
-  --accent-lime: #a6cf62;
-  --accent-lime-dim: #82ad42;
-  --accent-teal: #4ec9bb;
-  --accent-teal-dim: #269e93;
-  --accent-amber: #dfae63;
-  --accent-rose: #e97f92;
+  /* --- Accents. Deep enough to clear 4.5:1 on the cream ground,
+         muted enough that three of them never fight. --- */
+  --accent-ochre: #9c5f21;
+  --accent-ochre-dim: #7d4a17;
+  --accent-blue: #2a6398;
+  --accent-blue-dim: #1f4c76;
+  --accent-green: #2c7f63;
+  --accent-green-dim: #20624b;
+  --accent-amber: #8a6410;
+  --accent-rose: #b1385a;
+  --accent-rose-dim: #8e2b47;
+  --accent-purple: #6d43ad;
+  --accent-purple-dim: #563389;
 
-  /* --- Translucent accent washes (used for chips, glows, rails) --- */
-  --wash-emerald: rgb(79 212 147 / 0.12);
-  --wash-lime: rgb(166 207 98 / 0.12);
-  --wash-teal: rgb(78 201 187 / 0.12);
-  --wash-amber: rgb(223 174 99 / 0.12);
-  --wash-rose: rgb(233 127 146 / 0.12);
-  --wash-neutral: rgb(162 182 171 / 0.08);
+  /* --- Translucent accent washes (used for chips and rails) --- */
+  --wash-ochre: rgb(156 95 33 / 0.09);
+  --wash-blue: rgb(42 99 152 / 0.09);
+  --wash-green: rgb(44 127 99 / 0.09);
+  --wash-amber: rgb(138 100 16 / 0.09);
+  --wash-rose: rgb(177 56 90 / 0.08);
+  --wash-neutral: rgb(85 81 74 / 0.05);
 
   /* --- Pillar accent: re-bound per section so one card component
          adapts to Concepts / System Design / AI without variants --- */
-  --pillar: var(--accent-emerald);
-  --pillar-dim: var(--accent-emerald-dim);
-  --pillar-wash: var(--wash-emerald);
+  --pillar: var(--accent-ochre);
+  --pillar-dim: var(--accent-ochre-dim);
+  --pillar-wash: var(--wash-ochre);
 
-  /* --- Radius --- */
-  --radius-sm: 7px;
-  --radius-md: 12px;
-  --radius-lg: 18px;
-  --radius-xl: 26px;
+  /* --- Radius. Small and consistent — the shape language is
+         squared-off paper, not pill-shaped UI. --- */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
   --radius-full: 999px;
 
-  /* --- Elevation. Shadows are green-black so they read as depth
-         in this palette rather than as a grey film. --- */
-  --shadow-sm: 0 1px 2px rgb(0 12 7 / 0.5);
-  --shadow-md: 0 4px 16px -4px rgb(0 12 7 / 0.6);
-  --shadow-lg: 0 18px 48px -18px rgb(0 12 7 / 0.85);
-  /* Accent bloom for the few elements that should feel lit. */
-  --glow-pillar:
-    0 0 0 1px color-mix(in oklab, var(--pillar) 22%, transparent),
-    0 8px 32px -12px color-mix(in oklab, var(--pillar) 45%, transparent);
+  /* --- Elevation. Warm-tinted and shallow. Depth is carried by
+         hairline borders; shadow only separates true overlays. --- */
+  --shadow-sm: 0 1px 2px rgb(97 78 40 / 0.06);
+  --shadow-md: 0 2px 6px rgb(97 78 40 / 0.07);
+  --shadow-lg: 0 8px 28px -10px rgb(97 78 40 / 0.22);
+  /* The "lit" treatment is now just a firmer ring — no bloom. */
+  --ring-pillar: 0 0 0 1px color-mix(in oklab, var(--pillar) 32%, transparent);
 
   /* --- Type scale. Fluid where the size carries hierarchy, fixed
          where it carries information density. --- */
@@ -79,21 +99,22 @@
   --text-base: 0.9375rem;
   --text-body: 1.0625rem;
   --text-lg: 1.1875rem;
-  --text-xl: clamp(1.25rem, 1.8vw, 1.5rem);
-  --text-2xl: clamp(1.5rem, 2.6vw, 1.875rem);
-  --text-3xl: clamp(1.875rem, 3.6vw, 2.5rem);
-  --text-display: clamp(2.25rem, 5.6vw, 4rem);
+  --text-xl: clamp(1.2rem, 1.6vw, 1.4rem);
+  --text-2xl: clamp(1.4rem, 2.2vw, 1.7rem);
+  --text-3xl: clamp(1.7rem, 3vw, 2.1rem);
+  --text-display: clamp(2rem, 4.4vw, 3rem);
 
-  /* Tracking tightens as type grows, and opens up for small caps. */
-  --tracking-display: -0.045em;
-  --tracking-tight: -0.025em;
-  --tracking-normal: -0.011em;
-  --tracking-label: 0.13em;
+  /* Tracking. The system faces are already optically spaced, so
+     these are far gentler than a web font would need. */
+  --tracking-display: -0.022em;
+  --tracking-tight: -0.014em;
+  --tracking-normal: -0.006em;
+  --tracking-label: 0.08em;
 
-  --leading-display: 1.02;
-  --leading-tight: 1.18;
-  --leading-body: 1.62;
-  --leading-prose: 1.75;
+  --leading-display: 1.1;
+  --leading-tight: 1.25;
+  --leading-body: 1.65;
+  --leading-prose: 1.78;
 
   /* --- Z-index scale. Nothing in the codebase invents its own. --- */
   --z-base: 1;
@@ -102,89 +123,127 @@
   --z-scrim: 50;
   --z-drawer: 60;
   --z-overlay: 70;
-  --z-grain: 80;
   --z-skip: 90;
 
   /* --- Layout --- */
   --sidebar-width: 15.5rem;
   --header-height: 3.5rem;
-  --content-max: 78rem;
-  --prose-max: 68ch; /* ≈ 65–75 characters per line */
-
-  /* --- Texture. Fractal noise, inlined so it costs no request. --- */
-  --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  --content-max: 68rem;
+  --prose-max: 70ch; /* ≈ 65–75 characters per line */
 
   /* --- Motion --- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
   --dur-fast: 120ms;
-  --dur-base: 200ms;
-  --dur-slow: 320ms;
-
-  color-scheme: dark;
-}
-
-/* ============================================================
-   Light theme. Same token names, re-pointed — no component
-   anywhere needs to know which theme is active. Neutrals keep
-   the green cast so the two themes read as one design.
-   ============================================================ */
-
-:root[data-theme='light'] {
-  --bg-primary: #fbfdfb;
-  --bg-secondary: #eef5f0;
-  --surface: #ffffff;
-  --surface-hover: #f3f9f5;
-  --surface-raised: #ffffff;
-  --surface-inset: #edf4ef;
-
-  --border-subtle: #e0ebe4;
-  --border-default: #cddcd3;
-  --border-strong: #b0c6ba;
-
-  --text-primary: #071710;
-  --text-secondary: #44584e;
-  --text-muted: #6d857a;
-  --text-inverted: #ffffff;
-
-  --accent-emerald: #0a8f53;
-  --accent-emerald-dim: #076c3f;
-  --accent-lime: #4f7d10;
-  --accent-lime-dim: #3d6209;
-  --accent-teal: #0b8e83;
-  --accent-teal-dim: #087067;
-  --accent-amber: #a4700a;
-  --accent-rose: #c53355;
-
-  --wash-emerald: rgb(10 143 83 / 0.1);
-  --wash-lime: rgb(79 125 16 / 0.1);
-  --wash-teal: rgb(11 142 131 / 0.1);
-  --wash-amber: rgb(164 112 10 / 0.1);
-  --wash-rose: rgb(197 51 85 / 0.09);
-  --wash-neutral: rgb(68 88 78 / 0.07);
-
-  --shadow-sm: 0 1px 2px rgb(9 32 22 / 0.05);
-  --shadow-md: 0 4px 14px -4px rgb(9 32 22 / 0.1);
-  --shadow-lg: 0 18px 44px -18px rgb(9 32 22 / 0.2);
-  --glow-pillar:
-    0 0 0 1px color-mix(in oklab, var(--pillar) 18%, transparent),
-    0 8px 28px -14px color-mix(in oklab, var(--pillar) 40%, transparent);
+  --dur-base: 180ms;
+  --dur-slow: 280ms;
 
   color-scheme: light;
 }
 
+/* ============================================================
+   Dark theme. Same token names, re-pointed — no component
+   anywhere needs to know which theme is active. The neutrals
+   keep a warm cast so the two themes read as one design.
+   ============================================================ */
+
+:root[data-theme='dark'] {
+  --bg-primary: #1c1b19;
+  --bg-secondary: #191817;
+  --surface: #232220;
+  --surface-hover: #2b2a27;
+  --surface-raised: #262523;
+  --surface-inset: #1f1e1c;
+
+  --border-subtle: #302e2b;
+  --border-default: #3b3935;
+  --border-strong: #524f49;
+
+  --text-primary: #e9e5dc;
+  --text-secondary: #b0aba1;
+  --text-muted: #837e74;
+  --text-inverted: #1c1b19;
+
+  --accent-ochre: #e0b072;
+  --accent-ochre-dim: #c4924f;
+  --accent-blue: #8fb8e0;
+  --accent-blue-dim: #6d9bc9;
+  --accent-green: #85c3a6;
+  --accent-green-dim: #63a686;
+  --accent-amber: #d9bd7d;
+  --accent-rose: #e39aa6;
+  --accent-rose-dim: #cf7e8c;
+  --accent-purple: #c4a6ec;
+  --accent-purple-dim: #a684d6;
+
+  --wash-ochre: rgb(224 176 114 / 0.11);
+  --wash-blue: rgb(143 184 224 / 0.11);
+  --wash-green: rgb(133 195 166 / 0.11);
+  --wash-amber: rgb(217 189 125 / 0.11);
+  --wash-rose: rgb(227 154 166 / 0.1);
+  --wash-neutral: rgb(176 171 161 / 0.06);
+
+  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.3);
+  --shadow-md: 0 2px 6px rgb(0 0 0 / 0.35);
+  --shadow-lg: 0 8px 28px -10px rgb(0 0 0 / 0.6);
+  --ring-pillar: 0 0 0 1px color-mix(in oklab, var(--pillar) 30%, transparent);
+
+  color-scheme: dark;
+}
+
 /* Pillar bindings — set on any wrapper to re-tint its subtree. */
 .pillar-concepts {
-  --pillar: var(--accent-emerald);
-  --pillar-dim: var(--accent-emerald-dim);
-  --pillar-wash: var(--wash-emerald);
+  --pillar: var(--accent-ochre);
+  --pillar-dim: var(--accent-ochre-dim);
+  --pillar-wash: var(--wash-ochre);
 }
 .pillar-system-design {
-  --pillar: var(--accent-lime);
-  --pillar-dim: var(--accent-lime-dim);
-  --pillar-wash: var(--wash-lime);
+  --pillar: var(--accent-blue);
+  --pillar-dim: var(--accent-blue-dim);
+  --pillar-wash: var(--wash-blue);
 }
 .pillar-ai {
-  --pillar: var(--accent-teal);
-  --pillar-dim: var(--accent-teal-dim);
-  --pillar-wash: var(--wash-teal);
+  --pillar: var(--accent-green);
+  --pillar-dim: var(--accent-green-dim);
+  --pillar-wash: var(--wash-green);
+}
+
+/* ============================================================
+   Reader-chosen accent. With no `data-accent` the pillar classes
+   below stand and each section keeps its own colour; once a hue
+   is picked it overrides all three, so the whole site follows it.
+   The wash is mixed from the chosen hue rather than listed per
+   theme, so one definition covers light and dark.
+   ============================================================ */
+
+:root[data-accent='ochre'] {
+  --accent-user: var(--accent-ochre);
+  --accent-user-dim: var(--accent-ochre-dim);
+}
+:root[data-accent='blue'] {
+  --accent-user: var(--accent-blue);
+  --accent-user-dim: var(--accent-blue-dim);
+}
+:root[data-accent='green'] {
+  --accent-user: var(--accent-green);
+  --accent-user-dim: var(--accent-green-dim);
+}
+:root[data-accent='purple'] {
+  --accent-user: var(--accent-purple);
+  --accent-user-dim: var(--accent-purple-dim);
+}
+:root[data-accent='rose'] {
+  --accent-user: var(--accent-rose);
+  --accent-user-dim: var(--accent-rose-dim);
+}
+
+/* The pillar classes sit on descendants of <html>, so they would
+   otherwise win by inheritance no matter how specific the root
+   rule is — the override has to name them. */
+:root[data-accent],
+:root[data-accent] .pillar-concepts,
+:root[data-accent] .pillar-system-design,
+:root[data-accent] .pillar-ai {
+  --pillar: var(--accent-user);
+  --pillar-dim: var(--accent-user-dim);
+  --pillar-wash: color-mix(in oklab, var(--accent-user) 12%, transparent);
 }

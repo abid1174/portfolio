@@ -30,8 +30,7 @@ const { title, choice } = Astro.props;
     padding: 1.05rem 1.15rem 1.15rem;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-lg);
-    background:
-      linear-gradient(to bottom right, var(--wash-lime), transparent 55%), var(--surface);
+    background: var(--surface);
   }
 
   .decision-head {
@@ -40,7 +39,7 @@ const { title, choice } = Astro.props;
     align-items: flex-start;
   }
   .decision-head :global(svg) {
-    color: var(--accent-lime);
+    color: var(--accent-blue);
     flex-shrink: 0;
     margin-top: 0.85rem;
   }
@@ -52,7 +51,7 @@ const { title, choice } = Astro.props;
     font-weight: 600;
     letter-spacing: 0.12em;
     text-transform: uppercase;
-    color: var(--accent-lime);
+    color: var(--accent-blue);
   }
 
   .decision-title {

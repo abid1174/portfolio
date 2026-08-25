@@ -20,7 +20,7 @@ const tags = entry.tags.slice(0, maxTags);
 const overflow = entry.tags.length - tags.length;
 ---
 
-<article class:list={['card card-interactive ticked content-card', `is-${variant}`]}>
+<article class:list={['card card-interactive content-card', `is-${variant}`]}>
   <div class="card-top">
     <p class="label-mono card-category">
       {showPillar ? `${pillar.label} · ${entry.category}` : entry.category}

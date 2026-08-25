@@ -32,7 +32,7 @@
   font-size: var(--text-sm);
   font-weight: 500;
   text-decoration: none;
-  box-shadow: var(--glow-pillar);
+  box-shadow: var(--ring-pillar);
   transform: translateY(-200%);
   transition: transform var(--dur-base) var(--ease-out);
 }
@@ -320,36 +320,107 @@
 
 /* --- Theme switcher --- */
 
-.theme-switcher {
-  display: inline-flex;
-  gap: 1px;
-  padding: 2px;
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md);
-  background: var(--surface-inset);
+/* --- Appearance: accent swatch + day/night toggle --- */
+
+.appearance {
+  position: relative;
+  display: inline-block;
 }
 
-.theme-option {
+.appearance-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.appearance-btn {
   display: grid;
   place-items: center;
-  width: 1.6rem;
-  height: 1.5rem;
-  border: 0;
-  border-radius: var(--radius-sm);
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
   background: transparent;
   color: var(--text-muted);
   cursor: pointer;
   transition:
     background-color var(--dur-fast) var(--ease-out),
+    border-color var(--dur-fast) var(--ease-out),
     color var(--dur-fast) var(--ease-out);
 }
-.theme-option:hover {
+.appearance-btn:hover {
+  background: var(--surface-inset);
   color: var(--text-primary);
 }
-.theme-option[data-active='true'] {
+.accent-trigger[data-open='true'] {
+  background: var(--surface-inset);
+  border-color: var(--border-default);
+}
+
+/* The menu opens upward: these controls sit at the very bottom of the
+   sidebar, so a downward menu would be clipped by the viewport. */
+.accent-menu {
+  position: absolute;
+  bottom: calc(100% + 0.4rem);
+  left: 0;
+  z-index: var(--z-overlay);
+  display: grid;
+  gap: 0.1rem;
+  padding: 0.3rem;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
   background: var(--surface);
-  color: var(--accent-emerald);
-  box-shadow: var(--shadow-sm);
+  box-shadow: var(--shadow-lg);
+}
+
+.accent-option {
+  display: grid;
+  place-items: center;
+  width: 1.9rem;
+  height: 1.9rem;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+.accent-option:hover,
+.accent-option[data-active='true'] {
+  background: var(--surface-inset);
+}
+
+.swatch {
+  width: 0.85rem;
+  height: 0.85rem;
+  border-radius: 50%;
+  background: var(--swatch, var(--pillar));
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+/* `auto` keeps the per-section colours, so its swatch shows all
+   three rather than pretending to be a single hue. */
+.swatch[data-accent='auto'] {
+  background: conic-gradient(
+    from 210deg,
+    var(--accent-ochre) 0deg 120deg,
+    var(--accent-blue) 120deg 240deg,
+    var(--accent-green) 240deg 360deg
+  );
+}
+.swatch[data-accent='ochre'] {
+  --swatch: var(--accent-ochre);
+}
+.swatch[data-accent='blue'] {
+  --swatch: var(--accent-blue);
+}
+.swatch[data-accent='green'] {
+  --swatch: var(--accent-green);
+}
+.swatch[data-accent='purple'] {
+  --swatch: var(--accent-purple);
+}
+.swatch[data-accent='rose'] {
+  --swatch: var(--accent-rose);
 }
 
 /* --- Filters --- */
@@ -562,7 +633,7 @@
   background: var(--surface-hover);
 }
 .idiagram-layer[data-active='true'] {
-  border-left-color: var(--layer-accent, var(--accent-emerald));
+  border-left-color: var(--layer-accent, var(--accent-ochre));
   background: var(--surface-hover);
 }
 
@@ -585,7 +656,7 @@
   color: var(--text-primary);
 }
 .idiagram-layer[data-active='true'] .idiagram-label {
-  color: var(--layer-accent, var(--accent-emerald));
+  color: var(--layer-accent, var(--accent-ochre));
 }
 
 .idiagram-summary {
@@ -620,7 +691,7 @@
   color: var(--text-muted);
 }
 .idiagram-panel li::marker {
-  color: var(--layer-accent, var(--accent-emerald));
+  color: var(--layer-accent, var(--accent-ochre));
 }
 
 @media (max-width: 52rem) {

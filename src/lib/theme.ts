@@ -25,7 +25,7 @@ export function readTheme(): ThemeChoice {
   } catch {
     // Storage can be blocked; fall through to the default.
   }
-  return 'dark';
+  return 'light';
 }
 
 export function storeTheme(choice: ThemeChoice): void {
