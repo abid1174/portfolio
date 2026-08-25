@@ -1,17 +1,17 @@
 ---
-title: "Designing a Notification System"
-description: "Design a scalable notification system supporting email, SMS and push, with fan-out, retries, and per-channel rate limits."
-type: "system-design"
-category: "Messaging"
-tags: ["Messaging", "Queues", "Distributed Systems", "Reliability"]
-difficulty: "intermediate"
+title: 'Designing a Notification System'
+description: 'Design a scalable notification system supporting email, SMS and push, with fan-out, retries, and per-channel rate limits.'
+type: 'system-design'
+category: 'Messaging'
+tags: ['Messaging', 'Queues', 'Distributed Systems', 'Reliability']
+difficulty: 'intermediate'
 readingTime: 28
-publishedAt: "2026-04-14"
-updatedAt: "2026-08-02"
+publishedAt: '2026-04-14'
+updatedAt: '2026-08-02'
 featured: true
-diagram: "fanout"
-scale: "10M notifications/day, 350 QPS peak"
-related: ["concepts/idempotency", "concepts/outbox-pattern", "system-design/rate-limiter"]
+diagram: 'fanout'
+scale: '10M notifications/day, 350 QPS peak'
+related: ['concepts/idempotency', 'concepts/outbox-pattern', 'system-design/rate-limiter']
 ---
 
 Every product eventually needs to tell users things — an order shipped, a login from a new device, a friend request. The naive version is a function call from application code straight to a provider's API, and it works fine until you have five event sources, three channels, and a provider outage that starts silently dropping password reset emails. This is the design for the system that replaces that function call.
@@ -20,10 +20,12 @@ Every product eventually needs to tell users things — an order shipped, a logi
 
 We're building a notification service that other internal services call when something happens that a user should know about: `OrderShipped`, `PasswordChanged`, `NewMessage`, `PromotionalOffer`. The service decides how to deliver that event — email, SMS, push, or some combination — and guarantees the message reaches the user's device or inbox, or fails in a way that's visible to whoever needs to know.
 
-The system sits between dozens of upstream producers (checkout, auth, messaging, marketing) and a handful of downstream providers (SendGrid for email, Twilio for SMS, FCM/APNs for push). It owns templating, user preferences, rate limiting per user and per channel, retries, and delivery tracking. It explicitly does not own business logic — a producer decides *that* a notification should fire, we decide *how* it gets there.
+The system sits between dozens of upstream producers (checkout, auth, messaging, marketing) and a handful of downstream providers (SendGrid for email, Twilio for SMS, FCM/APNs for push). It owns templating, user preferences, rate limiting per user and per channel, retries, and delivery tracking. It explicitly does not own business logic — a producer decides _that_ a notification should fire, we decide _how_ it gets there.
 
 <Callout type="note">
-We're scoping this to transactional and triggered notifications, not a full marketing campaign/segmentation engine. Bulk marketing sends share the dispatch pipeline but have relaxed latency requirements and their own opt-out rules.
+  We're scoping this to transactional and triggered notifications, not a full marketing
+  campaign/segmentation engine. Bulk marketing sends share the dispatch pipeline but have
+  relaxed latency requirements and their own opt-out rules.
 </Callout>
 
 ## Requirements
@@ -46,7 +48,9 @@ We're scoping this to transactional and triggered notifications, not a full mark
 - Backpressure-safe: a slow provider must not block ingestion of new events.
 
 <Callout type="tip" title="Scope the SLA per notification class">
-Not every notification deserves the same latency budget. A 2FA code needs to land in under 10 seconds or the user gives up; a weekly digest email can sit in a queue for an hour. Splitting classes early avoids over-provisioning the fast path to serve slow traffic.
+  Not every notification deserves the same latency budget. A 2FA code needs to land in under 10
+  seconds or the user gives up; a weekly digest email can sit in a queue for an hour. Splitting
+  classes early avoids over-provisioning the fast path to serve slow traffic.
 </Callout>
 
 ## Capacity Estimation
@@ -63,11 +67,11 @@ Assume 50M monthly active users, averaging 6-7 notifications each per day across
 <Capacity
   title="Back-of-the-envelope"
   items={[
-    { label: "Daily notifications", value: "10M", note: "peak 3x during campaigns" },
-    { label: "Ingest QPS (peak)", value: "~700/s", note: "10M / 86400 x 3 x 2" },
-    { label: "Dispatch QPS (sustained)", value: "~350/s", note: "after batching + dedup" },
-    { label: "Storage / year", value: "~4.4 TB", note: "400B/record, 3x replication" },
-    { label: "Provider egress", value: "~1.1 MB/s avg", note: "60% email, 30% push, 10% SMS" }
+    { label: 'Daily notifications', value: '10M', note: 'peak 3x during campaigns' },
+    { label: 'Ingest QPS (peak)', value: '~700/s', note: '10M / 86400 x 3 x 2' },
+    { label: 'Dispatch QPS (sustained)', value: '~350/s', note: 'after batching + dedup' },
+    { label: 'Storage / year', value: '~4.4 TB', note: '400B/record, 3x replication' },
+    { label: 'Provider egress', value: '~1.1 MB/s avg', note: '60% email, 30% push, 10% SMS' },
   ]}
 />
 
@@ -175,11 +179,11 @@ CREATE INDEX idx_notifications_user ON notifications (user_id, created_at DESC);
 
 `notifications` is the logical event; `notification_deliveries` is one row per channel per notification, which is where retries, provider ids, and per-channel status live. Splitting them lets a single event fan out to N channels without duplicating the event payload, and lets us retry one channel's failure without touching the others.
 
-| Field | Purpose |
-|---|---|
-| `idempotency_key` unique constraint | Collapses duplicate producer calls at write time, not read time |
-| `notification_deliveries.attempt_count` | Drives exponential backoff and dead-letter threshold |
-| `user_preferences.quiet_hours` | Checked at render time, not enqueue time — see Deep Dive |
+| Field                                   | Purpose                                                         |
+| --------------------------------------- | --------------------------------------------------------------- |
+| `idempotency_key` unique constraint     | Collapses duplicate producer calls at write time, not read time |
+| `notification_deliveries.attempt_count` | Drives exponential backoff and dead-letter threshold            |
+| `user_preferences.quiet_hours`          | Checked at render time, not enqueue time — see Deep Dive        |
 
 ## High-Level Architecture
 
@@ -215,8 +219,14 @@ We can't get true exactly-once delivery to an external provider over an unreliab
 1. **Producer-level dedup**: the `Idempotency-Key` unique constraint on `notifications` means a retried producer call is a no-op — same key returns the existing record instead of creating a second one.
 2. **Provider-level dedup**: before calling a provider, the dispatch worker acquires a Redis key `SETNX dispatch:{delivery_id}` with a 24-hour TTL. If the key already exists, another worker (or a retried job) is already handling this delivery, so we skip. This closes the "two workers pick up the same queue message during a rebalance" race that at-least-once queues create.
 
-<Decision title="Deduplicate at the dispatcher" choice="Redis SETNX on delivery_id with a 24h TTL, checked before every provider call">
-This is cheap (single round trip), works across worker restarts, and the TTL bounds memory growth. The cost is a hard dependency on Redis being available on the hot path — we treat a Redis outage as "fail closed and let the queue redeliver later" rather than sending unprotected, because a duplicate SMS is worse than a delayed one.
+<Decision
+  title="Deduplicate at the dispatcher"
+  choice="Redis SETNX on delivery_id with a 24h TTL, checked before every provider call"
+>
+  This is cheap (single round trip), works across worker restarts, and the TTL bounds memory
+  growth. The cost is a hard dependency on Redis being available on the hot path — we treat a
+  Redis outage as "fail closed and let the queue redeliver later" rather than sending
+  unprotected, because a duplicate SMS is worse than a delayed one.
 </Decision>
 
 ### Template rendering
@@ -228,7 +238,10 @@ Templates are versioned and stored outside the hot path (S3 + a small in-memory 
 We run three logical queues — `critical` (2FA, security alerts), `transactional` (order updates, receipts), and `bulk` (digests, marketing) — backed by separate SQS queues (or separate Kafka topics with dedicated consumer groups). Workers are provisioned with weighted concurrency: critical gets its own dedicated worker pool sized for its SLA regardless of bulk traffic, so a marketing blast never starves a password reset email. This is the single most important operational decision in this system — conflating queues is the most common way these systems fail during a big campaign send.
 
 <Callout type="warning">
-Don't let "priority" become a single integer field on a shared queue with client-side sorting. Most managed queues don't guarantee priority ordering under load, and a busy queue means your "high priority" message still waits behind everything ahead of it. Physically separate queues with separate consumers are the only reliable way to protect the critical path.
+  Don't let "priority" become a single integer field on a shared queue with client-side sorting.
+  Most managed queues don't guarantee priority ordering under load, and a busy queue means your
+  "high priority" message still waits behind everything ahead of it. Physically separate queues
+  with separate consumers are the only reliable way to protect the critical path.
 </Callout>
 
 ### Rate limiting per user
@@ -237,17 +250,20 @@ Users can be over-notified — a chatty product sending 40 pushes in an hour is 
 
 ## Failure Handling
 
-| Failure | Detection | Response |
-|---|---|---|
-| Provider API down | HTTP 5xx / timeout on send call | Exponential backoff retry (1s, 5s, 30s, 5m, 30m), then dead-letter after 5 attempts |
-| Provider accepts but never confirms delivery | No webhook within SLA window | Mark `sent` but flag as unconfirmed after 15 min; surfaced in dashboard, not retried (avoids dupes) |
-| Worker crashes mid-dispatch | Queue visibility timeout expires | Message becomes visible again; Redis dedup key prevents double-send if the original call actually landed |
-| Template render error | Exception during render | Delivery marked `failed`, alert fired, does NOT retry (a broken template won't fix itself) |
-| Preference service unavailable | Timeout on preference lookup | Fail closed for marketing (skip send), fail open for critical security notifications, both logged |
-| Poison message (malformed payload) | Repeated dispatch failure, same error | After 3 identical failures, dead-letter immediately instead of exhausting full retry budget |
+| Failure                                      | Detection                             | Response                                                                                                 |
+| -------------------------------------------- | ------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Provider API down                            | HTTP 5xx / timeout on send call       | Exponential backoff retry (1s, 5s, 30s, 5m, 30m), then dead-letter after 5 attempts                      |
+| Provider accepts but never confirms delivery | No webhook within SLA window          | Mark `sent` but flag as unconfirmed after 15 min; surfaced in dashboard, not retried (avoids dupes)      |
+| Worker crashes mid-dispatch                  | Queue visibility timeout expires      | Message becomes visible again; Redis dedup key prevents double-send if the original call actually landed |
+| Template render error                        | Exception during render               | Delivery marked `failed`, alert fired, does NOT retry (a broken template won't fix itself)               |
+| Preference service unavailable               | Timeout on preference lookup          | Fail closed for marketing (skip send), fail open for critical security notifications, both logged        |
+| Poison message (malformed payload)           | Repeated dispatch failure, same error | After 3 identical failures, dead-letter immediately instead of exhausting full retry budget              |
 
 <Callout type="danger" title="Fail-open is a product decision, not an engineering default">
-We fail *open* for critical security notifications during a preference-service outage — a login alert should reach the user even if we can't confirm their SMS opt-in status. We fail *closed* for marketing. This has to be decided per category ahead of time; guessing during an incident means someone picks wrong under pressure.
+  We fail *open* for critical security notifications during a preference-service outage — a
+  login alert should reach the user even if we can't confirm their SMS opt-in status. We fail
+  *closed* for marketing. This has to be decided per category ahead of time; guessing during an
+  incident means someone picks wrong under pressure.
 </Callout>
 
 The dead-letter queue isn't a graveyard — a daily job replays DLQ entries after confirming the root cause is fixed, and anything older than 7 days gets escalated to a human for manual review, since silently dropping an event a user was owed is a support ticket waiting to happen.
@@ -273,8 +289,16 @@ For a global user base, we run dispatch workers regionally close to the provider
 <Tradeoff
   optionA="Kafka for the ingestion/dispatch queue"
   optionB="SQS (or equivalent managed queue) per priority tier"
-  a={["Replayable log — reprocess a bad deploy's worth of events", "Natural fit if other services already consume notification events", "You operate partitioning, rebalancing, and consumer lag"]}
-  b={["Fully managed, near-zero ops", "Built-in dead-letter queues and visibility timeouts", "No replay after a message is acked — a bug that mis-processes a batch is unrecoverable"]}
+  a={[
+    "Replayable log — reprocess a bad deploy's worth of events",
+    'Natural fit if other services already consume notification events',
+    'You operate partitioning, rebalancing, and consumer lag',
+  ]}
+  b={[
+    'Fully managed, near-zero ops',
+    'Built-in dead-letter queues and visibility timeouts',
+    'No replay after a message is acked — a bug that mis-processes a batch is unrecoverable',
+  ]}
   recommendation="Start on managed SQS-style queues split by priority; adopt Kafka only when you need other services to consume notification events as a stream, or hit a proven need for replay."
 />
 

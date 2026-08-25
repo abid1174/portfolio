@@ -1,15 +1,15 @@
 ---
-title: "What is a JWT?"
-description: "A JWT is a signed, self-contained token format that lets a server verify claims about a user without a database lookup, at the cost of being hard to revoke early."
-type: "concept"
-category: "Authentication"
-tags: ["JWT", "Authentication", "Security"]
-difficulty: "beginner"
+title: 'What is a JWT?'
+description: 'A JWT is a signed, self-contained token format that lets a server verify claims about a user without a database lookup, at the cost of being hard to revoke early.'
+type: 'concept'
+category: 'Authentication'
+tags: ['JWT', 'Authentication', 'Security']
+difficulty: 'beginner'
 readingTime: 6
-publishedAt: "2026-04-15"
-updatedAt: "2026-05-02"
+publishedAt: '2026-04-15'
+updatedAt: '2026-05-02'
 featured: false
-related: ["concepts/pkce", "concepts/oauth-2", "concepts/idempotency"]
+related: ['concepts/pkce', 'concepts/oauth-2', 'concepts/idempotency']
 ---
 
 A JSON Web Token (JWT) is a compact, URL-safe string that encodes a set of claims and a signature proving those claims haven't been tampered with. It's the format behind most "stateless" auth systems: instead of asking a database "is this session valid," the server just checks the signature.
@@ -38,16 +38,20 @@ The header names the signing algorithm and, usually, which key signed it. The pa
 
 The whole appeal is that verification is local. A service holding the issuer's public key (or, for symmetric algorithms, the shared secret) can validate a token without calling back to an auth server or a session store. That removes a network hop and a shared point of failure from every authenticated request, which matters a lot once you're running dozens of services behind an API gateway.
 
-| Approach | Lookup per request | Revocation | Cross-service validation |
-|---|---|---|---|
-| Opaque session token | Yes, hits a store | Immediate | Requires shared store or introspection call |
-| JWT | No, local signature check | Only at expiry, or via a blocklist | Any service with the public key |
+| Approach             | Lookup per request        | Revocation                         | Cross-service validation                    |
+| -------------------- | ------------------------- | ---------------------------------- | ------------------------------------------- |
+| Opaque session token | Yes, hits a store         | Immediate                          | Requires shared store or introspection call |
+| JWT                  | No, local signature check | Only at expiry, or via a blocklist | Any service with the public key             |
 
 <Tradeoff
   optionA="Opaque tokens"
   optionB="JWTs"
-  a={["Revocable instantly", "Requires a lookup per request", "Simple rotation"]}
-  b={["Stateless validation, no network hop", "Cannot be revoked before expiry without extra state", "Payload is visible to anyone holding the token"]}
+  a={['Revocable instantly', 'Requires a lookup per request', 'Simple rotation']}
+  b={[
+    'Stateless validation, no network hop',
+    'Cannot be revoked before expiry without extra state',
+    'Payload is visible to anyone holding the token',
+  ]}
   recommendation="Use short-lived JWTs (5-15 minutes) for access tokens, paired with an opaque, revocable refresh token for renewing them."
 />
 
@@ -58,32 +62,35 @@ The whole appeal is that verification is local. A service holding the issuer's p
 `RS256` (RSA-SHA256) uses a private key to sign and a public key to verify. The auth server keeps the private key; every downstream service only ever needs the public key, which it can fetch from a JWKS endpoint. This is the right default for anything with more than one service verifying tokens.
 
 ```ts
-import { SignJWT, jwtVerify, importPKCS8, importSPKI } from "jose";
+import { SignJWT, jwtVerify, importPKCS8, importSPKI } from 'jose';
 
 async function issueToken(privateKeyPem: string, sub: string) {
-  const privateKey = await importPKCS8(privateKeyPem, "RS256");
-  return new SignJWT({ scope: "read:orders" })
-    .setProtectedHeader({ alg: "RS256", kid: "2026-04-key" })
+  const privateKey = await importPKCS8(privateKeyPem, 'RS256');
+  return new SignJWT({ scope: 'read:orders' })
+    .setProtectedHeader({ alg: 'RS256', kid: '2026-04-key' })
     .setSubject(sub)
     .setIssuedAt()
-    .setIssuer("https://auth.example.com")
-    .setAudience("api.example.com")
-    .setExpirationTime("15m")
+    .setIssuer('https://auth.example.com')
+    .setAudience('api.example.com')
+    .setExpirationTime('15m')
     .sign(privateKey);
 }
 
 async function verifyToken(publicKeyPem: string, token: string) {
-  const publicKey = await importSPKI(publicKeyPem, "RS256");
+  const publicKey = await importSPKI(publicKeyPem, 'RS256');
   const { payload } = await jwtVerify(token, publicKey, {
-    issuer: "https://auth.example.com",
-    audience: "api.example.com",
+    issuer: 'https://auth.example.com',
+    audience: 'api.example.com',
   });
   return payload;
 }
 ```
 
 <Callout type="warning" title="Never accept alg: none">
-The JWT spec technically allows an unsigned token via `alg: none`. Older libraries trusted whatever algorithm the token itself claimed, which let an attacker hand-craft a token, set `alg` to `none`, and skip signature verification entirely. Always pin the expected algorithm on the verifying side instead of trusting the header.
+  The JWT spec technically allows an unsigned token via `alg: none`. Older libraries trusted
+  whatever algorithm the token itself claimed, which let an attacker hand-craft a token, set
+  `alg` to `none`, and skip signature verification entirely. Always pin the expected algorithm
+  on the verifying side instead of trusting the header.
 </Callout>
 
 ## JWTs Are Not Encrypted
@@ -91,7 +98,9 @@ The JWT spec technically allows an unsigned token via `alg: none`. Older librari
 This trips people up constantly: base64url is an encoding, not encryption. Anyone holding a JWT can decode the payload and read every claim in it without any key at all.
 
 <Callout type="danger">
-Never put secrets, passwords, or anything sensitive directly into a JWT payload. If you genuinely need confidentiality, use a JWE (JSON Web Encryption) instead, or just keep the sensitive data out of the token and look it up server-side using the `sub` claim.
+  Never put secrets, passwords, or anything sensitive directly into a JWT payload. If you
+  genuinely need confidentiality, use a JWE (JSON Web Encryption) instead, or just keep the
+  sensitive data out of the token and look it up server-side using the `sub` claim.
 </Callout>
 
 ## The Revocation Problem
@@ -107,7 +116,8 @@ Because verification is local, there's no natural place to say "this token is no
 Most systems don't rely on one JWT for everything. A short-lived JWT access token proves identity to resource servers; a longer-lived, opaque, revocable refresh token — stored server-side — is used only to mint new access tokens. This gets you the performance benefit of stateless validation for the high-volume path (every API call) while keeping a real revocation point for the low-volume path (refresh, logout, compromise response).
 
 <Callout type="insight">
-The refresh token is where your actual session state lives. The access token is closer to a temporary, cryptographically-backed cache of "this session was valid as of a few minutes ago."
+  The refresh token is where your actual session state lives. The access token is closer to a
+  temporary, cryptographically-backed cache of "this session was valid as of a few minutes ago."
 </Callout>
 
 ## Takeaway

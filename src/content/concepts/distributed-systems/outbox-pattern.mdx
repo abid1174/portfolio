@@ -1,15 +1,16 @@
 ---
-title: "What is the Outbox Pattern?"
-description: "The outbox pattern makes writing to a database and publishing an event look atomic by writing both in one transaction and relaying the event asynchronously."
-type: "concept"
-category: "Distributed Systems"
-tags: ["Distributed Systems", "Messaging", "Consistency", "Reliability", "Queues"]
-difficulty: "advanced"
+title: 'What is the Outbox Pattern?'
+description: 'The outbox pattern makes writing to a database and publishing an event look atomic by writing both in one transaction and relaying the event asynchronously.'
+type: 'concept'
+category: 'Distributed Systems'
+tags: ['Distributed Systems', 'Messaging', 'Consistency', 'Reliability', 'Queues']
+difficulty: 'advanced'
 readingTime: 10
-publishedAt: "2026-06-22"
-updatedAt: "2026-07-05"
+publishedAt: '2026-06-22'
+updatedAt: '2026-07-05'
 featured: false
-related: ["concepts/idempotency", "concepts/consistent-hashing", "system-design/notification-system"]
+related:
+  ['concepts/idempotency', 'concepts/consistent-hashing', 'system-design/notification-system']
 ---
 
 Any service that writes to its own database and then publishes an event about that write has a consistency problem hiding in plain sight: those are two separate operations against two separate systems, and one can succeed while the other fails. The outbox pattern makes them effectively atomic without a distributed transaction.
@@ -20,8 +21,8 @@ Consider an order service that saves a new order and publishes an `OrderCreated`
 
 ```ts
 async function createOrder(order: Order) {
-  await db.orders.insert(order);          // succeeds
-  await broker.publish("OrderCreated", order); // ...then the process crashes
+  await db.orders.insert(order); // succeeds
+  await broker.publish('OrderCreated', order); // ...then the process crashes
 }
 ```
 
@@ -72,15 +73,12 @@ A separate process — a poller or a change-data-capture stream — reads unpubl
 async function relayOutbox() {
   const rows = await db.query(
     `SELECT * FROM outbox WHERE published_at IS NULL
-     ORDER BY created_at LIMIT 100`
+     ORDER BY created_at LIMIT 100`,
   );
 
   for (const row of rows) {
     await broker.publish(row.event_type, row.payload);
-    await db.query(
-      `UPDATE outbox SET published_at = now() WHERE id = $1`,
-      [row.id]
-    );
+    await db.query(`UPDATE outbox SET published_at = now() WHERE id = $1`, [row.id]);
   }
 }
 ```
@@ -92,20 +90,25 @@ The simplest version of the relay is a polling loop like this. A more efficient 
 The relay can crash between publishing to the broker and marking the row published. When it restarts, it will publish that row again. The outbox pattern gives you at-least-once delivery, not exactly-once — and that's a feature, not a shortfall, because exactly-once delivery across two independent systems isn't achievable without cooperation from the consumer anyway.
 
 <Callout type="warning">
-Every consumer of outbox-published events has to be idempotent — safe to process the same event twice without double-charging a card, double-sending an email, or double-decrementing inventory. Idempotency isn't optional here; it's the other half of the pattern.
+  Every consumer of outbox-published events has to be idempotent — safe to process the same
+  event twice without double-charging a card, double-sending an email, or double-decrementing
+  inventory. Idempotency isn't optional here; it's the other half of the pattern.
 </Callout>
 
 ## Outbox vs Two-Phase Commit vs CDC-Only
 
-| Approach | Atomicity guarantee | Broker coupling | Operational cost |
-|---|---|---|---|
-| Direct dual write | None — can silently diverge | Tight, synchronous | Low, until it breaks |
-| Two-phase commit (XA) | Strong, if broker supports XA | Very tight | High, most brokers/queues don't support it well |
-| Transactional outbox + polling relay | Strong (write side), at-least-once delivery | Loose | Moderate, relay process to run |
-| Transactional outbox + CDC | Strong (write side), at-least-once, low latency | Loose | Higher setup cost (Debezium/CDC pipeline), lower ongoing polling load |
+| Approach                             | Atomicity guarantee                             | Broker coupling    | Operational cost                                                      |
+| ------------------------------------ | ----------------------------------------------- | ------------------ | --------------------------------------------------------------------- |
+| Direct dual write                    | None — can silently diverge                     | Tight, synchronous | Low, until it breaks                                                  |
+| Two-phase commit (XA)                | Strong, if broker supports XA                   | Very tight         | High, most brokers/queues don't support it well                       |
+| Transactional outbox + polling relay | Strong (write side), at-least-once delivery     | Loose              | Moderate, relay process to run                                        |
+| Transactional outbox + CDC           | Strong (write side), at-least-once, low latency | Loose              | Higher setup cost (Debezium/CDC pipeline), lower ongoing polling load |
 
 <Callout type="insight">
-Two-phase commit looks like the "correct" textbook answer, but almost nothing you actually want to use in production — Kafka, SQS, RabbitMQ — participates in a distributed transaction coordinator. The outbox pattern sidesteps the whole problem by only requiring atomicity within the database you already have transactions in.
+  Two-phase commit looks like the "correct" textbook answer, but almost nothing you actually
+  want to use in production — Kafka, SQS, RabbitMQ — participates in a distributed transaction
+  coordinator. The outbox pattern sidesteps the whole problem by only requiring atomicity within
+  the database you already have transactions in.
 </Callout>
 
 ## Common Pitfalls
@@ -116,7 +119,9 @@ Two-phase commit looks like the "correct" textbook answer, but almost nothing yo
 - Treating outbox delivery as exactly-once and building consumers that aren't idempotent, which silently corrupts data the first time a redelivery happens.
 
 <Callout type="tip">
-If you need strict per-aggregate ordering, partition the broker topic by `aggregate_id` and have the relay preserve `created_at` order within each aggregate — most brokers only guarantee ordering within a partition, not across an entire topic.
+  If you need strict per-aggregate ordering, partition the broker topic by `aggregate_id` and
+  have the relay preserve `created_at` order within each aggregate — most brokers only guarantee
+  ordering within a partition, not across an entire topic.
 </Callout>
 
 ## Takeaway

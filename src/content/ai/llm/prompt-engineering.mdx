@@ -1,15 +1,15 @@
 ---
-title: "Prompt Engineering Fundamentals"
-description: "Structuring prompts, choosing between system and user content, and the failure modes that show up once a prompt leaves the playground."
-type: "ai"
-category: "Prompt Engineering"
-tags: ["Prompt Engineering", "LLM", "Evaluation", "API Design"]
-difficulty: "beginner"
+title: 'Prompt Engineering Fundamentals'
+description: 'Structuring prompts, choosing between system and user content, and the failure modes that show up once a prompt leaves the playground.'
+type: 'ai'
+category: 'Prompt Engineering'
+tags: ['Prompt Engineering', 'LLM', 'Evaluation', 'API Design']
+difficulty: 'beginner'
 readingTime: 11
-publishedAt: "2026-06-15"
-updatedAt: "2026-06-29"
+publishedAt: '2026-06-15'
+updatedAt: '2026-06-29'
 featured: true
-related: ["ai/rag", "ai/llm-evaluation", "ai/tool-calling"]
+related: ['ai/rag', 'ai/llm-evaluation', 'ai/tool-calling']
 ---
 
 Prompt engineering has a reputation as trial and error, and a lot of it still is. But the parts that actually generalize across models and tasks are ordinary engineering discipline: clear structure, explicit constraints, and testing against real inputs rather than the three examples you tried in a chat window.
@@ -19,7 +19,9 @@ Prompt engineering has a reputation as trial and error, and a lot of it still is
 A prompt is an interface, and interfaces have the same failure modes whether the thing on the other end is a REST API or a language model: ambiguous inputs produce inconsistent outputs, missing constraints get filled in with whatever the model assumes, and untested edge cases fail in production instead of in review. The difference from a typical API is that the model doesn't reject a malformed request with a 400 — it does its best to answer anyway, which means prompt bugs surface as subtly wrong output rather than a stack trace.
 
 <Callout type="note">
-Treat a prompt like you'd treat a function signature: inputs, expected output shape, and the constraints that make the output usable downstream. If you can't write down what a correct response looks like, you can't reliably prompt for it either.
+  Treat a prompt like you'd treat a function signature: inputs, expected output shape, and the
+  constraints that make the output usable downstream. If you can't write down what a correct
+  response looks like, you can't reliably prompt for it either.
 </Callout>
 
 ## Structure Beats Cleverness
@@ -44,20 +46,22 @@ Classify the ticket into exactly one category: billing, bug, feature.
 ```
 
 <Callout type="tip">
-Put the actual data (the ticket, the document, the transcript) after the instructions, not before. Instructions that come after a large block of data compete with everything the model just read for attention, and in practice get followed less reliably.
+  Put the actual data (the ticket, the document, the transcript) after the instructions, not
+  before. Instructions that come after a large block of data compete with everything the model
+  just read for attention, and in practice get followed less reliably.
 </Callout>
 
 ## System Prompts vs User Messages
 
 The system prompt is the right place for content that's stable across every call — role definition, output format, tone, tool descriptions. The user message is the right place for the actual per-request input. Mixing them — rebuilding a slightly different "system" instruction on every call — defeats prompt caching, since caching depends on a stable prefix that doesn't change byte-for-byte between requests.
 
-| Content | Belongs in |
-|---|---|
-| Role, persona, global constraints | System prompt |
-| Output format instructions | System prompt |
-| Few-shot examples (if stable) | System prompt |
-| The specific question or document | User message |
-| Conversation history | Messages array |
+| Content                           | Belongs in     |
+| --------------------------------- | -------------- |
+| Role, persona, global constraints | System prompt  |
+| Output format instructions        | System prompt  |
+| Few-shot examples (if stable)     | System prompt  |
+| The specific question or document | User message   |
+| Conversation history              | Messages array |
 
 ## Few-Shot Examples
 
@@ -88,22 +92,22 @@ Asking a model to "return JSON" in prose is unreliable at the margins — it'll 
 
 ```ts
 const response = await client.messages.create({
-  model: "claude-sonnet-5",
+  model: 'claude-sonnet-5',
   max_tokens: 256,
   output_config: {
     format: {
-      type: "json_schema",
+      type: 'json_schema',
       schema: {
-        type: "object",
+        type: 'object',
         properties: {
-          category: { type: "string", enum: ["billing", "bug", "feature"] },
-          confidence: { type: "number" },
+          category: { type: 'string', enum: ['billing', 'bug', 'feature'] },
+          confidence: { type: 'number' },
         },
-        required: ["category", "confidence"],
+        required: ['category', 'confidence'],
       },
     },
   },
-  messages: [{ role: "user", content: ticketText }],
+  messages: [{ role: 'user', content: ticketText }],
 });
 ```
 
@@ -113,9 +117,24 @@ A prompt tuned for one model tier isn't automatically portable to another. Small
 
 <ModelComparison
   models={[
-    { name: "claude-opus-5", context: "1M", strengths: "Deepest reasoning, long multi-step tasks, ambiguous instructions", tradeoff: "Higher latency and cost for simple tasks" },
-    { name: "claude-sonnet-5", context: "1M", strengths: "Balanced quality and speed, default for most production prompts", tradeoff: "Occasionally needs more explicit structure than Opus for edge cases" },
-    { name: "claude-haiku-4-5-20251001", context: "200K", strengths: "Fast, cheap for classification and extraction", tradeoff: "Needs tightly structured prompts; weaker on multi-step reasoning" }
+    {
+      name: 'claude-opus-5',
+      context: '1M',
+      strengths: 'Deepest reasoning, long multi-step tasks, ambiguous instructions',
+      tradeoff: 'Higher latency and cost for simple tasks',
+    },
+    {
+      name: 'claude-sonnet-5',
+      context: '1M',
+      strengths: 'Balanced quality and speed, default for most production prompts',
+      tradeoff: 'Occasionally needs more explicit structure than Opus for edge cases',
+    },
+    {
+      name: 'claude-haiku-4-5-20251001',
+      context: '200K',
+      strengths: 'Fast, cheap for classification and extraction',
+      tradeoff: 'Needs tightly structured prompts; weaker on multi-step reasoning',
+    },
   ]}
 />
 
@@ -124,7 +143,9 @@ A prompt tuned for one model tier isn't automatically portable to another. Small
 Instruction dilution is the most common one: as a prompt accumulates more and more special-case rules over time, earlier constraints quietly stop being followed as reliably, because the model is balancing an increasing number of competing instructions. Periodically rewrite rather than endlessly append.
 
 <Callout type="warning">
-"Never do X" instructions are weaker than positive instructions describing what to do instead. A prompt that lists ten things not to do gives the model ten ways to accidentally violate one while satisfying the others. State the desired behavior directly wherever you can.
+  "Never do X" instructions are weaker than positive instructions describing what to do instead.
+  A prompt that lists ten things not to do gives the model ten ways to accidentally violate one
+  while satisfying the others. State the desired behavior directly wherever you can.
 </Callout>
 
 Context poisoning shows up in multi-turn agents: an early wrong answer or malformed tool call, left uncorrected in the conversation history, gets treated as established fact on every subsequent turn and compounds.

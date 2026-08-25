@@ -2,7 +2,6 @@
 import { ArrowRight } from 'lucide-react';
 
 interface Props {
-  eyebrow?: string;
   title: string;
   description?: string;
   href?: string;
@@ -13,7 +12,6 @@ interface Props {
 }
 
 const {
-  eyebrow,
   title,
   description,
   href,
@@ -27,7 +25,6 @@ const Heading = level === 'page' ? 'h1' : 'h2';
 
 <header class:list={['section-header', `is-${level}`, className]}>
   <div class="section-header-text">
-    {eyebrow && <p class="label-mono eyebrow">{eyebrow}</p>}
     <Heading class="title">{title}</Heading>
     {description && <p class="description">{description}</p>}
   </div>
@@ -51,44 +48,31 @@ const Heading = level === 'page' ? 'h1' : 'h2';
     flex-wrap: wrap;
   }
 
-  .eyebrow {
-    display: flex;
-    align-items: center;
-    gap: 0.55rem;
-    margin: 0 0 0.6rem;
-    color: var(--pillar);
-  }
-  .eyebrow::before {
-    content: '';
-    width: 14px;
-    height: 1px;
-    background: currentColor;
-  }
-
   .title {
     margin: 0;
     color: var(--text-primary);
   }
 
   .is-section .title {
-    font-size: clamp(1.375rem, 2.4vw, 1.75rem);
+    font-size: var(--text-2xl);
+    letter-spacing: var(--tracking-tight);
   }
 
   .is-page .title {
-    font-size: clamp(2.125rem, 5vw, 2.875rem);
-    letter-spacing: -0.03em;
+    font-size: var(--text-3xl);
+    letter-spacing: var(--tracking-display);
   }
 
   .description {
-    margin: 0.6rem 0 0;
+    margin: 0.65rem 0 0;
     max-width: 46ch;
     color: var(--text-secondary);
-    font-size: 0.9375rem;
-    line-height: 1.65;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
   }
 
   .is-page .description {
-    font-size: 1.0625rem;
+    font-size: var(--text-body);
     max-width: 54ch;
   }
 
@@ -98,7 +82,8 @@ const Heading = level === 'page' ? 'h1' : 'h2';
     gap: 0.4rem;
     padding-bottom: 0.2rem;
     color: var(--text-secondary);
-    font-size: 0.8125rem;
+    font-family: var(--font-display);
+    font-size: var(--text-sm);
     font-weight: 500;
     text-decoration: none;
     white-space: nowrap;

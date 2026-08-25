@@ -1,15 +1,16 @@
 ---
-title: "What is a Database Index?"
+title: 'What is a Database Index?'
 description: "A database index trades extra storage and slower writes for the ability to find rows without scanning the whole table, the same trade a book's index makes for its reader."
-type: "concept"
-category: "Databases"
-tags: ["Databases", "Indexing", "SQL", "Performance"]
-difficulty: "beginner"
+type: 'concept'
+category: 'Databases'
+tags: ['Databases', 'Indexing', 'SQL', 'Performance']
+difficulty: 'beginner'
 readingTime: 7
-publishedAt: "2026-05-25"
-updatedAt: "2026-05-25"
+publishedAt: '2026-05-25'
+updatedAt: '2026-05-25'
 featured: true
-related: ["concepts/cache-stampede", "system-design/url-shortener", "concepts/consistent-hashing"]
+related:
+  ['concepts/cache-stampede', 'system-design/url-shortener', 'concepts/consistent-hashing']
 ---
 
 Without an index, finding a row means checking every row — a full table scan. An index is a separate, ordered data structure that lets the database jump straight to the rows that match, at the cost of extra storage and slower writes to keep it up to date.
@@ -48,7 +49,11 @@ SELECT * FROM users WHERE email = 'a@b.com';
 The cost estimate dropping from 185,000 to roughly 8 is the entire point: the planner switched from reading the whole table to walking a tree with a handful of levels.
 
 <Callout type="note">
-Not every index is a B-tree. Hash indexes are faster for pure equality lookups but useless for ranges. GIN and GiST indexes handle full-text search, arrays, and geometric data. Postgres also supports BRIN indexes for huge, naturally-ordered tables like time-series data, where you don't need per-row precision, just per-block. Default to B-tree unless you have a specific reason not to.
+  Not every index is a B-tree. Hash indexes are faster for pure equality lookups but useless for
+  ranges. GIN and GiST indexes handle full-text search, arrays, and geometric data. Postgres
+  also supports BRIN indexes for huge, naturally-ordered tables like time-series data, where you
+  don't need per-row precision, just per-block. Default to B-tree unless you have a specific
+  reason not to.
 </Callout>
 
 ## Composite Indexes and Column Order
@@ -82,24 +87,30 @@ WHERE customer_id = 42;
 ```
 
 <Callout type="tip">
-Covering indexes are a strong lever for read-heavy, narrow queries — dashboards, list views — but resist the urge to make every index cover every possible query. Each additional included column grows the index and adds write overhead for a benefit that only pays off if that exact query shape actually runs often.
+  Covering indexes are a strong lever for read-heavy, narrow queries — dashboards, list views —
+  but resist the urge to make every index cover every possible query. Each additional included
+  column grows the index and adds write overhead for a benefit that only pays off if that exact
+  query shape actually runs often.
 </Callout>
 
 ## Index Types at a Glance
 
-| Index type | Best for | Weak at |
-|---|---|---|
-| B-tree | Equality and range queries, sorting | Full-text search |
-| Hash | Pure equality lookups | Range queries, ordering |
-| GIN | Full-text search, arrays, JSONB containment | Range queries |
-| BRIN | Huge tables with naturally sorted data (timestamps) | Random access patterns |
+| Index type | Best for                                            | Weak at                 |
+| ---------- | --------------------------------------------------- | ----------------------- |
+| B-tree     | Equality and range queries, sorting                 | Full-text search        |
+| Hash       | Pure equality lookups                               | Range queries, ordering |
+| GIN        | Full-text search, arrays, JSONB containment         | Range queries           |
+| BRIN       | Huge tables with naturally sorted data (timestamps) | Random access patterns  |
 
 ## The Cost: Every Write Pays For It
 
 Indexes aren't free. Every `INSERT`, `UPDATE`, or `DELETE` has to update every index on the affected columns, not just write the row. A table with six indexes pays that cost six times on every write, plus the storage each index consumes on disk.
 
 <Callout type="warning">
-A common failure mode is a table with a dozen indexes added incrementally by different features, each individually justified, collectively turning every write into a slow, multi-index update. Periodically check for genuinely unused indexes (`pg_stat_user_indexes` in Postgres) and drop them — an index nobody queries against is pure write overhead.
+  A common failure mode is a table with a dozen indexes added incrementally by different
+  features, each individually justified, collectively turning every write into a slow,
+  multi-index update. Periodically check for genuinely unused indexes (`pg_stat_user_indexes` in
+  Postgres) and drop them — an index nobody queries against is pure write overhead.
 </Callout>
 
 ## Reading an Execution Plan

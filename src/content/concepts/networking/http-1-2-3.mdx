@@ -1,15 +1,15 @@
 ---
-title: "HTTP/1.1 vs HTTP/2 vs HTTP/3"
-description: "Each HTTP version fixes a specific bottleneck in the one before it, moving from one request per connection to multiplexed streams to a transport that no longer blocks on packet loss."
-type: "concept"
-category: "Networking"
-tags: ["Networking", "HTTP", "Performance", "TLS"]
-difficulty: "intermediate"
+title: 'HTTP/1.1 vs HTTP/2 vs HTTP/3'
+description: 'Each HTTP version fixes a specific bottleneck in the one before it, moving from one request per connection to multiplexed streams to a transport that no longer blocks on packet loss.'
+type: 'concept'
+category: 'Networking'
+tags: ['Networking', 'HTTP', 'Performance', 'TLS']
+difficulty: 'intermediate'
 readingTime: 9
-publishedAt: "2026-05-10"
-updatedAt: "2026-06-01"
+publishedAt: '2026-05-10'
+updatedAt: '2026-06-01'
 featured: true
-related: ["concepts/circuit-breaker", "system-design/chat-system", "concepts/cache-stampede"]
+related: ['concepts/circuit-breaker', 'system-design/chat-system', 'concepts/cache-stampede']
 ---
 
 The jump from HTTP/1.1 to HTTP/2 to HTTP/3 isn't three unrelated redesigns — it's the same problem, head-of-line blocking, getting attacked at a different layer each time. Understanding what each version actually fixed makes it obvious when upgrading matters and when it doesn't.
@@ -36,15 +36,19 @@ This is why bundlers spent a decade concatenating JS and CSS files, sprite-sheet
 
 HTTP/2 keeps the request/response model but changes the wire format entirely: everything is binary-framed, and multiple requests and responses can interleave over a single TCP connection as independent "streams." A large response no longer blocks a small one behind it on the same connection.
 
-| Property | HTTP/1.1 | HTTP/2 |
-|---|---|---|
-| Format | Text | Binary framed |
-| Requests per connection | 1 at a time (browsers open ~6 connections) | Many, multiplexed |
-| Header overhead | Full headers every request | HPACK compression, incremental |
-| Head-of-line blocking | Per connection | Eliminated at the HTTP layer, still present at the TCP layer |
+| Property                | HTTP/1.1                                   | HTTP/2                                                       |
+| ----------------------- | ------------------------------------------ | ------------------------------------------------------------ |
+| Format                  | Text                                       | Binary framed                                                |
+| Requests per connection | 1 at a time (browsers open ~6 connections) | Many, multiplexed                                            |
+| Header overhead         | Full headers every request                 | HPACK compression, incremental                               |
+| Head-of-line blocking   | Per connection                             | Eliminated at the HTTP layer, still present at the TCP layer |
 
 <Callout type="note">
-HTTP/2 also introduced server push — letting the server proactively send resources it knows the client will need. It looked great on paper and turned out badly in practice: servers routinely pushed things the browser already had cached, wasting bandwidth. Chrome and most other browsers removed support for it; the technique that actually stuck is preload hints (`Link: rel=preload`), which tell the client what to fetch without forcing it.
+  HTTP/2 also introduced server push — letting the server proactively send resources it knows
+  the client will need. It looked great on paper and turned out badly in practice: servers
+  routinely pushed things the browser already had cached, wasting bandwidth. Chrome and most
+  other browsers removed support for it; the technique that actually stuck is preload hints
+  (`Link: rel=preload`), which tell the client what to fetch without forcing it.
 </Callout>
 
 Because HTTP/2 bundling advantages made the old HTTP/1.1 optimizations counterproductive — concatenating files now hurts caching granularity for no connection benefit — a lot of "modern" frontend build advice (small, cacheable chunks over one giant bundle) only makes sense once you assume HTTP/2 or later.
@@ -54,7 +58,9 @@ Because HTTP/2 bundling advantages made the old HTTP/1.1 optimizations counterpr
 Multiplexing streams over one TCP connection solves head-of-line blocking at the application layer, but TCP itself still delivers bytes in strict order. If a single packet is lost, TCP holds every stream's data that arrived after it, even for streams unrelated to the lost packet, until retransmission fills the gap. On a lossy connection — mobile networks, congested Wi-Fi — this reintroduces exactly the blocking HTTP/2 was designed to eliminate, just one layer down.
 
 <Callout type="warning">
-This is the core reason HTTP/2 didn't fully deliver on mobile: a 1% packet loss rate on a connection carrying 100 multiplexed streams can stall all 100 of them waiting on one retransmission, even though 99 streams had nothing to do with the lost packet.
+  This is the core reason HTTP/2 didn't fully deliver on mobile: a 1% packet loss rate on a
+  connection carrying 100 multiplexed streams can stall all 100 of them waiting on one
+  retransmission, even though 99 streams had nothing to do with the lost packet.
 </Callout>
 
 ## HTTP/3: Moving Off TCP
@@ -69,19 +75,22 @@ curl -sI --http2 https://example.com | grep -i alt-svc
 
 QUIC also folds TLS 1.3 into the transport handshake itself, rather than layering it on top of an already-established TCP connection, which cuts a round trip off connection setup. And because QUIC connections are identified by a connection ID rather than the traditional IP/port tuple, a client switching networks — Wi-Fi to cellular — can keep the same connection alive instead of renegotiating from scratch, a property called connection migration.
 
-| Property | HTTP/2 | HTTP/3 |
-|---|---|---|
-| Transport | TCP | QUIC over UDP |
-| Head-of-line blocking | At the TCP layer, under packet loss | Eliminated per-stream |
-| Handshake | TCP handshake, then TLS handshake | Combined into one |
-| Network switching | Connection drops, must reconnect | Connection migration, stays alive |
+| Property              | HTTP/2                              | HTTP/3                            |
+| --------------------- | ----------------------------------- | --------------------------------- |
+| Transport             | TCP                                 | QUIC over UDP                     |
+| Head-of-line blocking | At the TCP layer, under packet loss | Eliminated per-stream             |
+| Handshake             | TCP handshake, then TLS handshake   | Combined into one                 |
+| Network switching     | Connection drops, must reconnect    | Connection migration, stays alive |
 
 ## When It Actually Matters
 
 For a low-latency API on a stable data-center network, HTTP/1.1 vs HTTP/2 vs HTTP/3 is often a rounding error — the bottleneck is your database query, not the transport. The gains show up in specific conditions: many small concurrent requests (HTTP/2's multiplexing), lossy or high-latency networks like mobile (HTTP/3's per-stream loss recovery), and connection setup cost on repeated short-lived requests (QUIC's combined handshake).
 
 <Callout type="insight">
-Enabling HTTP/2 or HTTP/3 on your server is close to free — most CDNs and load balancers do it automatically. But if your application still ships giant server-rendered HTML with a handful of requests per page, the protocol upgrade won't move your numbers much. The wins are largest for request-heavy, latency-sensitive, or mobile-heavy workloads.
+  Enabling HTTP/2 or HTTP/3 on your server is close to free — most CDNs and load balancers do it
+  automatically. But if your application still ships giant server-rendered HTML with a handful
+  of requests per page, the protocol upgrade won't move your numbers much. The wins are largest
+  for request-heavy, latency-sensitive, or mobile-heavy workloads.
 </Callout>
 
 ## Takeaway

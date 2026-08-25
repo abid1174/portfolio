@@ -1,17 +1,18 @@
 ---
-title: "Designing a URL Shortener"
-description: "Design a URL shortening service like Bitly: encoding schemes, redirect latency, and read-heavy caching at scale."
-type: "system-design"
-category: "Storage"
-tags: ["Storage", "Caching", "Redis", "API Design"]
-difficulty: "beginner"
+title: 'Designing a URL Shortener'
+description: 'Design a URL shortening service like Bitly: encoding schemes, redirect latency, and read-heavy caching at scale.'
+type: 'system-design'
+category: 'Storage'
+tags: ['Storage', 'Caching', 'Redis', 'API Design']
+difficulty: 'beginner'
 readingTime: 18
-publishedAt: "2026-04-10"
-updatedAt: "2026-07-15"
+publishedAt: '2026-04-10'
+updatedAt: '2026-07-15'
 featured: true
-diagram: "keyvalue"
-scale: "100M new URLs/month, 8K redirects/sec peak"
-related: ["concepts/consistent-hashing", "concepts/database-index", "system-design/rate-limiter"]
+diagram: 'keyvalue'
+scale: '100M new URLs/month, 8K redirects/sec peak'
+related:
+  ['concepts/consistent-hashing', 'concepts/database-index', 'system-design/rate-limiter']
 ---
 
 A URL shortener looks trivial — map a long URL to a short code, redirect on lookup — and that simplicity is exactly why it's a good interview and design-review subject: the interesting decisions are all in the details of encoding, caching, and read/write ratios, not in inventing new mechanisms.
@@ -41,7 +42,9 @@ We also need custom aliases (`sho.rt/my-launch`), expiration, and basic click an
 - Eventually consistent click counts are fine; the redirect itself must be strongly consistent (never redirect to a stale or wrong URL).
 
 <Callout type="note">
-We're deliberately not designing for password-protected links or link-level access control here — that's a real feature in production shorteners, but it doesn't change the core system shape, so it's out of scope for this write-up.
+  We're deliberately not designing for password-protected links or link-level access control
+  here — that's a real feature in production shorteners, but it doesn't change the core system
+  shape, so it's out of scope for this write-up.
 </Callout>
 
 ## Capacity Estimation
@@ -58,11 +61,15 @@ Assume 100M new short URLs created per month, and a 100:1 read/write ratio for r
 <Capacity
   title="Back-of-the-envelope"
   items={[
-    { label: "New URLs / month", value: "100M", note: "≈ 39 writes/sec avg" },
-    { label: "Redirect QPS (peak)", value: "~8,000/s", note: "100:1 read/write, 2x daily peak" },
-    { label: "Storage / month", value: "~15 GB", note: "150 bytes/record" },
-    { label: "5-year storage", value: "~900 GB", note: "links rarely get deleted" },
-    { label: "Keyspace (7-char base62)", value: "62^7 ≈ 3.5T", note: "no exhaustion risk" }
+    { label: 'New URLs / month', value: '100M', note: '≈ 39 writes/sec avg' },
+    {
+      label: 'Redirect QPS (peak)',
+      value: '~8,000/s',
+      note: '100:1 read/write, 2x daily peak',
+    },
+    { label: 'Storage / month', value: '~15 GB', note: '150 bytes/record' },
+    { label: '5-year storage', value: '~900 GB', note: 'links rarely get deleted' },
+    { label: 'Keyspace (7-char base62)', value: '62^7 ≈ 3.5T', note: 'no exhaustion risk' },
   ]}
 />
 
@@ -142,10 +149,10 @@ CREATE INDEX idx_clicks_code_time ON click_events (short_code, clicked_at DESC);
 
 `urls` is small (150 bytes/row, ~900GB over 5 years) and fits comfortably in a key-value store or a sharded relational table keyed by `short_code`. `click_events` is the high-volume table — one row per redirect, so it inherits the same 8,000 writes/sec profile as the redirect path — and is partitioned by time so old partitions can be rolled up into daily aggregates and dropped, keeping the hot partition small.
 
-| Table | Row count (5yr) | Access pattern |
-|---|---|---|
-| `urls` | ~6B | Point lookup by `short_code`, extremely read-heavy |
-| `click_events` | tens of billions | Write-heavy append, read via aggregation only |
+| Table          | Row count (5yr)  | Access pattern                                     |
+| -------------- | ---------------- | -------------------------------------------------- |
+| `urls`         | ~6B              | Point lookup by `short_code`, extremely read-heavy |
+| `click_events` | tens of billions | Write-heavy append, read via aggregation only      |
 
 ## High-Level Architecture
 
@@ -172,8 +179,16 @@ Two viable approaches, and the choice matters more than it looks:
 
 **Counter-based**: maintain a globally unique, monotonically increasing id (via a dedicated id-generation service, or Snowflake-style worker-id + timestamp + sequence), then base62-encode that id directly into a short code. No collisions by construction — the id space and the code space are in bijection. The cost is operating an id generator that itself needs to be highly available and non-blocking.
 
-<Decision title="Counter-based generation over hashing" choice="Snowflake-style distributed id generator, base62-encoded">
-Hash-based collision handling adds a retry loop to every single write and gets worse as the table fills up — exactly the wrong direction for a system that's supposed to get simpler to reason about over time, not more failure-prone. A distributed counter (64-bit: timestamp + worker id + sequence) gives collision-free codes with predictable latency, at the cost of running one more small stateful service. Given writes are only ~40/s average, the id generator is never the bottleneck.
+<Decision
+  title="Counter-based generation over hashing"
+  choice="Snowflake-style distributed id generator, base62-encoded"
+>
+  Hash-based collision handling adds a retry loop to every single write and gets worse as the
+  table fills up — exactly the wrong direction for a system that's supposed to get simpler to
+  reason about over time, not more failure-prone. A distributed counter (64-bit: timestamp +
+  worker id + sequence) gives collision-free codes with predictable latency, at the cost of
+  running one more small stateful service. Given writes are only ~40/s average, the id generator
+  is never the bottleneck.
 </Decision>
 
 Base62-encoding a 64-bit id produces up to 11 characters, longer than we want for a "short" URL. We truncate the generator's sequence space so ids fit in 7 base62 characters for the first several years of operation (about 3.5 trillion values, see Capacity Estimation), then widen to 8 characters — a one-time, foreseeable migration rather than an emergency one.
@@ -187,7 +202,11 @@ Custom aliases skip the generator entirely — the user's requested string is th
 Redis holds `short_code → long_url` with a TTL, sized to keep the working set (recently created and recently popular links — this follows a strong power-law distribution, a small fraction of links account for most redirects) in memory. On a cache miss, the redirect service reads through to the database and populates the cache before responding. We use cache-aside rather than write-through because writes are rare enough that pre-warming the cache on every write buys nothing, and we'd rather keep the write path simple.
 
 <Callout type="tip">
-Set a short TTL (minutes, not hours) even though `long_url` almost never changes after creation. The TTL isn't there for correctness — it's there so a link that suddenly goes viral doesn't permanently occupy cache memory it no longer needs once traffic fades, and so an expired or deleted link's stale mapping ages out on its own instead of needing an active eviction on delete.
+  Set a short TTL (minutes, not hours) even though `long_url` almost never changes after
+  creation. The TTL isn't there for correctness — it's there so a link that suddenly goes viral
+  doesn't permanently occupy cache memory it no longer needs once traffic fades, and so an
+  expired or deleted link's stale mapping ages out on its own instead of needing an active
+  eviction on delete.
 </Callout>
 
 ### Redirect status code: 301 vs 302
@@ -200,16 +219,22 @@ The redirect response should never wait on writing an analytics row. The redirec
 
 ## Failure Handling
 
-| Failure | Detection | Response |
-|---|---|---|
-| Cache node down | Connection errors from Redis client | Read through to database directly; degraded latency, not degraded correctness |
-| Database primary down | Health check / replication lag alert | Promote a read replica; short window of write unavailability, reads continue from replica |
-| Id generator unavailable | Timeout on next-id call | Write API returns 503 for new shortens; existing redirects are entirely unaffected since they don't call the generator |
-| Click event queue backs up | Queue depth alert | Drop oldest events past a buffer threshold — approximate click counts are an acceptable degradation, lost redirects are not |
-| Malicious/spam URL submitted | Async URL-safety scan flags it | Link is disabled (redirect returns 410 Gone) after the fact; we don't block synchronously on a safety-check API during creation, since that would put an external dependency in the write path's latency budget |
+| Failure                      | Detection                            | Response                                                                                                                                                                                                        |
+| ---------------------------- | ------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Cache node down              | Connection errors from Redis client  | Read through to database directly; degraded latency, not degraded correctness                                                                                                                                   |
+| Database primary down        | Health check / replication lag alert | Promote a read replica; short window of write unavailability, reads continue from replica                                                                                                                       |
+| Id generator unavailable     | Timeout on next-id call              | Write API returns 503 for new shortens; existing redirects are entirely unaffected since they don't call the generator                                                                                          |
+| Click event queue backs up   | Queue depth alert                    | Drop oldest events past a buffer threshold — approximate click counts are an acceptable degradation, lost redirects are not                                                                                     |
+| Malicious/spam URL submitted | Async URL-safety scan flags it       | Link is disabled (redirect returns 410 Gone) after the fact; we don't block synchronously on a safety-check API during creation, since that would put an external dependency in the write path's latency budget |
 
-<Callout type="warning" title="Never let analytics durability requirements leak into the redirect path">
-The single most common design mistake in a URL shortener is writing the click event synchronously before issuing the redirect. It couples the most latency-critical path in the system to the durability guarantees of an analytics pipeline that doesn't need them. Keep them decoupled from day one — retrofitting this split under load is painful.
+<Callout
+  type="warning"
+  title="Never let analytics durability requirements leak into the redirect path"
+>
+  The single most common design mistake in a URL shortener is writing the click event
+  synchronously before issuing the redirect. It couples the most latency-critical path in the
+  system to the durability guarantees of an analytics pipeline that doesn't need them. Keep them
+  decoupled from day one — retrofitting this split under load is painful.
 </Callout>
 
 ## Scaling
@@ -233,8 +258,16 @@ Writes stay low-volume (tens per second) essentially forever relative to redirec
 <Tradeoff
   optionA="Hash-based short code (MD5/SHA truncated)"
   optionB="Counter-based short code (distributed id generator)"
-  a={["No extra service to run", "Collision-check-and-retry loop needed on every write", "Collision rate worsens as the table fills"]}
-  b={["Zero collisions by construction, predictable write latency", "One more small stateful service to operate", "Straightforward to reason about and audit"]}
+  a={[
+    'No extra service to run',
+    'Collision-check-and-retry loop needed on every write',
+    'Collision rate worsens as the table fills',
+  ]}
+  b={[
+    'Zero collisions by construction, predictable write latency',
+    'One more small stateful service to operate',
+    'Straightforward to reason about and audit',
+  ]}
   recommendation="Counter-based generation for anything expecting sustained growth past a few hundred million URLs — the operational cost of one small id service is lower than the long-tail cost of a growing collision rate."
 />
 

@@ -1,15 +1,15 @@
 ---
-title: "What is Idempotency?"
+title: 'What is Idempotency?'
 description: "An idempotent operation produces the same result no matter how many times it's applied, which is the property that makes retrying a failed request safe in a distributed system."
-type: "concept"
-category: "Distributed Systems"
-tags: ["Distributed Systems", "API Design", "Reliability", "Concurrency"]
-difficulty: "intermediate"
+type: 'concept'
+category: 'Distributed Systems'
+tags: ['Distributed Systems', 'API Design', 'Reliability', 'Concurrency']
+difficulty: 'intermediate'
 readingTime: 8
-publishedAt: "2026-07-10"
-updatedAt: "2026-07-10"
+publishedAt: '2026-07-10'
+updatedAt: '2026-07-10'
 featured: false
-related: ["concepts/outbox-pattern", "concepts/circuit-breaker", "system-design/rate-limiter"]
+related: ['concepts/outbox-pattern', 'concepts/circuit-breaker', 'system-design/rate-limiter']
 ---
 
 An operation is idempotent if performing it once has the same effect as performing it five times. That single property is what makes it safe to retry a request after a timeout, and in a distributed system, retries aren't an edge case — they're a constant, because you can never fully tell the difference between "the request failed" and "the response got lost."
@@ -34,16 +34,19 @@ If `POST /charge` isn't idempotent, that retry double-charges the customer. The 
 
 Some operations are idempotent for free. `Set balance to 500` gives the same result no matter how many times you run it. Others are inherently not: `Add 500 to balance` produces a different result every time it's applied, and no amount of careful coding changes that math — the operation itself has to change, or you need to layer deduplication on top of it.
 
-| HTTP method | Idempotent by spec | Why |
-|---|---|---|
-| `GET` | Yes | Read-only, no state change |
-| `PUT` | Yes | Replaces a resource with a given representation |
-| `DELETE` | Yes | Resource is gone whether you delete it once or five times |
-| `POST` | No | Typically creates a new resource each call |
-| `PATCH` | Not guaranteed | Depends entirely on what the patch expresses |
+| HTTP method | Idempotent by spec | Why                                                       |
+| ----------- | ------------------ | --------------------------------------------------------- |
+| `GET`       | Yes                | Read-only, no state change                                |
+| `PUT`       | Yes                | Replaces a resource with a given representation           |
+| `DELETE`    | Yes                | Resource is gone whether you delete it once or five times |
+| `POST`      | No                 | Typically creates a new resource each call                |
+| `PATCH`     | Not guaranteed     | Depends entirely on what the patch expresses              |
 
 <Callout type="note">
-"Idempotent by spec" describes intended semantics, not a guarantee your implementation honors them. A `PUT` handler that appends to a log instead of replacing a value is not actually idempotent no matter what the HTTP method suggests. The method is a contract with the caller, not something the framework enforces for you.
+  "Idempotent by spec" describes intended semantics, not a guarantee your implementation honors
+  them. A `PUT` handler that appends to a log instead of replacing a value is not actually
+  idempotent no matter what the HTTP method suggests. The method is a contract with the caller,
+  not something the framework enforces for you.
 </Callout>
 
 ## Idempotency Keys
@@ -61,25 +64,22 @@ Content-Type: application/json
 
 ```ts
 async function handleCharge(req: Request) {
-  const key = req.headers.get("Idempotency-Key");
-  if (!key) throw new BadRequest("Idempotency-Key required");
+  const key = req.headers.get('Idempotency-Key');
+  if (!key) throw new BadRequest('Idempotency-Key required');
 
   const existing = await db.idempotencyKeys.findOne({ key });
   if (existing) {
-    if (existing.status === "in_progress") {
-      throw new Conflict("Request with this key is already being processed");
+    if (existing.status === 'in_progress') {
+      throw new Conflict('Request with this key is already being processed');
     }
     return existing.response; // safe to replay
   }
 
-  await db.idempotencyKeys.insert({ key, status: "in_progress" });
+  await db.idempotencyKeys.insert({ key, status: 'in_progress' });
 
   const charge = await paymentProvider.charge(req.body);
 
-  await db.idempotencyKeys.update(
-    { key },
-    { status: "completed", response: charge }
-  );
+  await db.idempotencyKeys.update({ key }, { status: 'completed', response: charge });
 
   return charge;
 }
@@ -88,7 +88,9 @@ async function handleCharge(req: Request) {
 The key is scoped to the client's intent, not the request's contents — the client generates it once per logical operation (once per "user clicked Pay") and reuses the same key on every retry of that same operation, even though the retries are technically separate HTTP requests.
 
 <Callout type="tip">
-Generate idempotency keys client-side with a UUID, and hold onto the same key across retries of the same user action — regenerating it on retry defeats the entire mechanism, since the server sees what looks like a brand-new operation each time.
+  Generate idempotency keys client-side with a UUID, and hold onto the same key across retries
+  of the same user action — regenerating it on retry defeats the entire mechanism, since the
+  server sees what looks like a brand-new operation each time.
 </Callout>
 
 ## The Race Condition Everyone Misses First
@@ -109,7 +111,9 @@ INSERT INTO idempotency_keys (key, status) VALUES ($1, 'in_progress');
 ```
 
 <Callout type="warning">
-A distributed cache with `SETNX` works the same way as a unique constraint — the point is that whatever store you use, the "claim this key" step has to be a single atomic operation, not a read followed by a separate write.
+  A distributed cache with `SETNX` works the same way as a unique constraint — the point is that
+  whatever store you use, the "claim this key" step has to be a single atomic operation, not a
+  read followed by a separate write.
 </Callout>
 
 ## Idempotency Isn't Free

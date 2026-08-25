@@ -57,8 +57,9 @@ const graphs = [...siteJsonLd(), ...jsonLd];
     <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
-    <Font cssVariable="--font-inter" preload />
-    <Font cssVariable="--font-jetbrains" />
+    <Font cssVariable="--font-geist" preload />
+    <Font cssVariable="--font-display" preload />
+    <Font cssVariable="--font-geist-mono" />
 
     <script is:inline>
       // Applies the saved theme before first paint. Inline and blocking
@@ -90,5 +91,49 @@ const graphs = [...siteJsonLd(), ...jsonLd];
   <body class={pillarClass} data-drawer="closed">
     <a class="skip-link" href="#main">Skip to content</a>
     <slot />
+    <div class="grain" aria-hidden="true"></div>
+
+    <script>
+      /**
+       * Feeds the pointer position to interactive cards as `--mx/--my`
+       * so their border can light up under the cursor. Listener is
+       * passive and coalesced into rAF; with JS off the gradient just
+       * stays centred. Skipped entirely for coarse pointers and for
+       * readers who asked for reduced motion.
+       */
+      const fine = matchMedia('(hover: hover) and (pointer: fine)');
+      const still = matchMedia('(prefers-reduced-motion: reduce)');
+
+      if (fine.matches && !still.matches) {
+        let queued = false;
+        let target: HTMLElement | null = null;
+        let point = { x: 0, y: 0 };
+
+        const paint = () => {
+          queued = false;
+          if (!target) return;
+          const box = target.getBoundingClientRect();
+          target.style.setProperty('--mx', `${point.x - box.left}px`);
+          target.style.setProperty('--my', `${point.y - box.top}px`);
+        };
+
+        document.addEventListener(
+          'pointermove',
+          (event) => {
+            const card = (event.target as HTMLElement).closest<HTMLElement>(
+              '.card-interactive',
+            );
+            if (!card) return;
+            target = card;
+            point = { x: event.clientX, y: event.clientY };
+            if (!queued) {
+              queued = true;
+              requestAnimationFrame(paint);
+            }
+          },
+          { passive: true },
+        );
+      }
+    </script>
   </body>
 </html>

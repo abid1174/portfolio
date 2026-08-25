@@ -23,7 +23,7 @@ const layers = [
       'Databases, indexes, caching',
       'Distributed systems primitives',
     ],
-    accent: 'var(--accent-blue)',
+    accent: 'var(--accent-emerald)',
   },
   {
     id: 'system-design',
@@ -37,7 +37,7 @@ const layers = [
       'Explicit trade-offs and decisions',
       'What breaks, and what happens then',
     ],
-    accent: 'var(--accent-purple)',
+    accent: 'var(--accent-lime)',
   },
   {
     id: 'ai',
@@ -51,7 +51,7 @@ const layers = [
       'Evaluation that means something',
       'Serving and infrastructure',
     ],
-    accent: 'var(--accent-cyan)',
+    accent: 'var(--accent-teal)',
   },
 ];
 
@@ -81,7 +81,7 @@ const principles = [
   jsonLd={[breadcrumbJsonLd([{ label: 'Home', href: '/' }, { label: 'About' }])]}
 >
   <div class="page">
-    <SectionHeader level="page" eyebrow="About" title={site.name} description={site.bio} />
+    <SectionHeader level="page" title={site.name} description={site.bio} />
 
     <div class="intro">
       <div class="intro-copy">
@@ -129,7 +129,6 @@ const principles = [
 
     <section class="block">
       <SectionHeader
-        eyebrow="How it is organised"
         title="Three layers, one model"
         description="Each layer depends on the one above it. Select a layer to see what belongs there."
       />
@@ -137,7 +136,7 @@ const principles = [
     </section>
 
     <section class="block">
-      <SectionHeader eyebrow="House rules" title="How pages get written" />
+      <SectionHeader title="How pages get written" />
       <ul class="principles">
         {
           principles.map((principle, i) => (
@@ -154,7 +153,7 @@ const principles = [
     </section>
 
     <section class="block">
-      <SectionHeader eyebrow="Colophon" title="How it is built" />
+      <SectionHeader title="How it is built" />
       <p class="colophon">
         Astro with React islands, MDX content in Git, Zod-validated frontmatter, Tailwind on top
         of CSS custom properties, and a client-side search index built at compile time. No
@@ -276,7 +275,7 @@ const principles = [
   .principle-no {
     font-family: var(--font-mono);
     font-size: 0.6875rem;
-    color: var(--accent-blue);
+    color: var(--accent-emerald);
   }
 
   .principles h3 {

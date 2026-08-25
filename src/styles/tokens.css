@@ -2,69 +2,117 @@
    Design tokens — single source of truth for colour, space,
    radius, elevation and motion. Components must never inline
    raw colour values; always reference a token.
+
+   Palette: "verdant" — green-tinted neutrals under an emerald
+   primary, with lime and teal as the two supporting accents.
+   Every neutral carries a trace of green so surfaces, borders
+   and text sit in the same family as the accents.
    ============================================================ */
 
 :root {
   /* --- Surfaces (dark is the primary theme) --- */
-  --bg-primary: #07080c;
-  --bg-secondary: #0a0c13;
-  --surface: #10131c;
-  --surface-hover: #161a26;
-  --surface-raised: #131722;
-  --surface-inset: #0c0f17;
+  --bg-primary: #050908;
+  --bg-secondary: #080e0b;
+  --surface: #0c1410;
+  --surface-hover: #121c17;
+  --surface-raised: #0f1814;
+  --surface-inset: #08110d;
 
   /* --- Lines --- */
-  --border-subtle: #1b2030;
-  --border-default: #232a3d;
-  --border-strong: #303950;
+  --border-subtle: #16221c;
+  --border-default: #1f2f27;
+  --border-strong: #2d4137;
 
   /* --- Text --- */
-  --text-primary: #e9edf5;
-  --text-secondary: #a3adc2;
-  --text-muted: #6d7689;
-  --text-inverted: #07080c;
+  --text-primary: #e8f2ec;
+  --text-secondary: #a2b6ab;
+  --text-muted: #6b8076;
+  --text-inverted: #04120b;
 
   /* --- Accents --- */
-  --accent-blue: #5b8cff;
-  --accent-blue-dim: #3d6ce0;
-  --accent-purple: #a77dff;
-  --accent-purple-dim: #8757e8;
-  --accent-cyan: #34d8c0;
-  --accent-cyan-dim: #17b3a0;
-  --accent-amber: #e8b04b;
-  --accent-rose: #f2688c;
+  --accent-emerald: #4fd493;
+  --accent-emerald-dim: #27a875;
+  --accent-lime: #a6cf62;
+  --accent-lime-dim: #82ad42;
+  --accent-teal: #4ec9bb;
+  --accent-teal-dim: #269e93;
+  --accent-amber: #dfae63;
+  --accent-rose: #e97f92;
 
   /* --- Translucent accent washes (used for chips, glows, rails) --- */
-  --wash-blue: rgb(91 140 255 / 0.12);
-  --wash-purple: rgb(167 125 255 / 0.12);
-  --wash-cyan: rgb(52 216 192 / 0.12);
-  --wash-amber: rgb(232 176 75 / 0.12);
-  --wash-rose: rgb(242 104 140 / 0.12);
-  --wash-neutral: rgb(163 173 194 / 0.08);
+  --wash-emerald: rgb(79 212 147 / 0.12);
+  --wash-lime: rgb(166 207 98 / 0.12);
+  --wash-teal: rgb(78 201 187 / 0.12);
+  --wash-amber: rgb(223 174 99 / 0.12);
+  --wash-rose: rgb(233 127 146 / 0.12);
+  --wash-neutral: rgb(162 182 171 / 0.08);
 
   /* --- Pillar accent: re-bound per section so one card component
          adapts to Concepts / System Design / AI without variants --- */
-  --pillar: var(--accent-blue);
-  --pillar-dim: var(--accent-blue-dim);
-  --pillar-wash: var(--wash-blue);
+  --pillar: var(--accent-emerald);
+  --pillar-dim: var(--accent-emerald-dim);
+  --pillar-wash: var(--wash-emerald);
 
   /* --- Radius --- */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 22px;
+  --radius-sm: 7px;
+  --radius-md: 12px;
+  --radius-lg: 18px;
+  --radius-xl: 26px;
   --radius-full: 999px;
 
-  /* --- Elevation --- */
-  --shadow-sm: 0 1px 2px rgb(0 0 0 / 0.4);
-  --shadow-md: 0 4px 16px -4px rgb(0 0 0 / 0.5);
-  --shadow-lg: 0 18px 48px -18px rgb(0 0 0 / 0.75);
+  /* --- Elevation. Shadows are green-black so they read as depth
+         in this palette rather than as a grey film. --- */
+  --shadow-sm: 0 1px 2px rgb(0 12 7 / 0.5);
+  --shadow-md: 0 4px 16px -4px rgb(0 12 7 / 0.6);
+  --shadow-lg: 0 18px 48px -18px rgb(0 12 7 / 0.85);
+  /* Accent bloom for the few elements that should feel lit. */
+  --glow-pillar:
+    0 0 0 1px color-mix(in oklab, var(--pillar) 22%, transparent),
+    0 8px 32px -12px color-mix(in oklab, var(--pillar) 45%, transparent);
+
+  /* --- Type scale. Fluid where the size carries hierarchy, fixed
+         where it carries information density. --- */
+  --text-2xs: 0.6875rem;
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-md: 0.875rem;
+  --text-base: 0.9375rem;
+  --text-body: 1.0625rem;
+  --text-lg: 1.1875rem;
+  --text-xl: clamp(1.25rem, 1.8vw, 1.5rem);
+  --text-2xl: clamp(1.5rem, 2.6vw, 1.875rem);
+  --text-3xl: clamp(1.875rem, 3.6vw, 2.5rem);
+  --text-display: clamp(2.25rem, 5.6vw, 4rem);
+
+  /* Tracking tightens as type grows, and opens up for small caps. */
+  --tracking-display: -0.045em;
+  --tracking-tight: -0.025em;
+  --tracking-normal: -0.011em;
+  --tracking-label: 0.13em;
+
+  --leading-display: 1.02;
+  --leading-tight: 1.18;
+  --leading-body: 1.62;
+  --leading-prose: 1.75;
+
+  /* --- Z-index scale. Nothing in the codebase invents its own. --- */
+  --z-base: 1;
+  --z-sticky: 20;
+  --z-header: 40;
+  --z-scrim: 50;
+  --z-drawer: 60;
+  --z-overlay: 70;
+  --z-grain: 80;
+  --z-skip: 90;
 
   /* --- Layout --- */
   --sidebar-width: 15.5rem;
   --header-height: 3.5rem;
   --content-max: 78rem;
   --prose-max: 68ch; /* ≈ 65–75 characters per line */
+
+  /* --- Texture. Fractal noise, inlined so it costs no request. --- */
+  --grain-url: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.82' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
 
   /* --- Motion --- */
   --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
@@ -77,62 +125,66 @@
 
 /* ============================================================
    Light theme. Same token names, re-pointed — no component
-   anywhere needs to know which theme is active.
+   anywhere needs to know which theme is active. Neutrals keep
+   the green cast so the two themes read as one design.
    ============================================================ */
 
 :root[data-theme='light'] {
-  --bg-primary: #fcfdff;
-  --bg-secondary: #f2f5fa;
+  --bg-primary: #fbfdfb;
+  --bg-secondary: #eef5f0;
   --surface: #ffffff;
-  --surface-hover: #f4f7fc;
+  --surface-hover: #f3f9f5;
   --surface-raised: #ffffff;
-  --surface-inset: #f0f3f9;
+  --surface-inset: #edf4ef;
 
-  --border-subtle: #e3e8f1;
-  --border-default: #d3dae7;
-  --border-strong: #b9c3d5;
+  --border-subtle: #e0ebe4;
+  --border-default: #cddcd3;
+  --border-strong: #b0c6ba;
 
-  --text-primary: #0c111c;
-  --text-secondary: #4b5568;
-  --text-muted: #77819a;
+  --text-primary: #071710;
+  --text-secondary: #44584e;
+  --text-muted: #6d857a;
   --text-inverted: #ffffff;
 
-  --accent-blue: #2f63e0;
-  --accent-blue-dim: #234ec0;
-  --accent-purple: #7c46e0;
-  --accent-purple-dim: #6532c4;
-  --accent-cyan: #0f9e8c;
-  --accent-cyan-dim: #0b7f70;
-  --accent-amber: #a9720b;
-  --accent-rose: #d2385f;
+  --accent-emerald: #0a8f53;
+  --accent-emerald-dim: #076c3f;
+  --accent-lime: #4f7d10;
+  --accent-lime-dim: #3d6209;
+  --accent-teal: #0b8e83;
+  --accent-teal-dim: #087067;
+  --accent-amber: #a4700a;
+  --accent-rose: #c53355;
 
-  --wash-blue: rgb(47 99 224 / 0.09);
-  --wash-purple: rgb(124 70 224 / 0.09);
-  --wash-cyan: rgb(15 158 140 / 0.1);
-  --wash-amber: rgb(169 114 11 / 0.1);
-  --wash-rose: rgb(210 56 95 / 0.09);
-  --wash-neutral: rgb(75 85 104 / 0.07);
+  --wash-emerald: rgb(10 143 83 / 0.1);
+  --wash-lime: rgb(79 125 16 / 0.1);
+  --wash-teal: rgb(11 142 131 / 0.1);
+  --wash-amber: rgb(164 112 10 / 0.1);
+  --wash-rose: rgb(197 51 85 / 0.09);
+  --wash-neutral: rgb(68 88 78 / 0.07);
 
-  --shadow-sm: 0 1px 2px rgb(16 24 40 / 0.05);
-  --shadow-md: 0 4px 14px -4px rgb(16 24 40 / 0.1);
-  --shadow-lg: 0 18px 44px -18px rgb(16 24 40 / 0.2);
+  --shadow-sm: 0 1px 2px rgb(9 32 22 / 0.05);
+  --shadow-md: 0 4px 14px -4px rgb(9 32 22 / 0.1);
+  --shadow-lg: 0 18px 44px -18px rgb(9 32 22 / 0.2);
+  --glow-pillar:
+    0 0 0 1px color-mix(in oklab, var(--pillar) 18%, transparent),
+    0 8px 28px -14px color-mix(in oklab, var(--pillar) 40%, transparent);
 
   color-scheme: light;
 }
 
 /* Pillar bindings — set on any wrapper to re-tint its subtree. */
 .pillar-concepts {
-  --pillar: var(--accent-blue);
-  --pillar-dim: var(--accent-blue-dim);
-  --pillar-wash: var(--wash-blue);
+  --pillar: var(--accent-emerald);
+  --pillar-dim: var(--accent-emerald-dim);
+  --pillar-wash: var(--wash-emerald);
 }
 .pillar-system-design {
-  --pillar: var(--accent-purple);
-  --pillar-dim: var(--accent-purple-dim);
-  --pillar-wash: var(--wash-purple);
+  --pillar: var(--accent-lime);
+  --pillar-dim: var(--accent-lime-dim);
+  --pillar-wash: var(--wash-lime);
 }
 .pillar-ai {
-  --pillar: var(--accent-cyan);
-  --pillar-dim: var(--accent-cyan-dim);
-  --pillar-wash: var(--wash-cyan);
+  --pillar: var(--accent-teal);
+  --pillar-dim: var(--accent-teal-dim);
+  --pillar-wash: var(--wash-teal);
 }

@@ -1,17 +1,18 @@
 ---
-title: "Designing a Chat System"
-description: "Design a real-time chat system like WhatsApp or Slack: connection management, message ordering, delivery guarantees, and fan-out at scale."
-type: "system-design"
-category: "Real-time"
-tags: ["Real-time", "Distributed Systems", "Messaging", "Consistency"]
-difficulty: "advanced"
+title: 'Designing a Chat System'
+description: 'Design a real-time chat system like WhatsApp or Slack: connection management, message ordering, delivery guarantees, and fan-out at scale.'
+type: 'system-design'
+category: 'Real-time'
+tags: ['Real-time', 'Distributed Systems', 'Messaging', 'Consistency']
+difficulty: 'advanced'
 readingTime: 35
-publishedAt: "2026-05-06"
-updatedAt: "2026-08-18"
+publishedAt: '2026-05-06'
+updatedAt: '2026-08-18'
 featured: true
-diagram: "realtime"
-scale: "50M DAU, 2M concurrent connections, 15B messages/day"
-related: ["concepts/consistent-hashing", "concepts/idempotency", "system-design/notification-system"]
+diagram: 'realtime'
+scale: '50M DAU, 2M concurrent connections, 15B messages/day'
+related:
+  ['concepts/consistent-hashing', 'concepts/idempotency', 'system-design/notification-system']
 ---
 
 Chat systems are one of the harder distributed systems problems disguised as a simple product: send a message, the other person sees it. Underneath is a persistent-connection management problem at massive scale, a message-ordering problem across unreliable networks, and a delivery-guarantee problem that has to survive users going offline mid-conversation for days.
@@ -23,7 +24,10 @@ We're designing a chat system supporting one-on-one and small group conversation
 The core tension is that chat wants two things that are in some tension with each other: low-latency real-time delivery when both parties are online, and durable, ordered, exactly-once-feeling delivery when they're not. The architecture is largely about serving both without one compromising the other.
 
 <Callout type="note">
-We're scoping out end-to-end encryption key management and media (image/video) handling in detail — both are real and substantial subsystems, but the message-routing and delivery-guarantee core described here is unaffected by whether the payload is plaintext or a ciphertext blob, or whether it's a text string or a media reference.
+  We're scoping out end-to-end encryption key management and media (image/video) handling in
+  detail — both are real and substantial subsystems, but the message-routing and
+  delivery-guarantee core described here is unaffected by whether the payload is plaintext or a
+  ciphertext blob, or whether it's a text string or a media reference.
 </Callout>
 
 ## Requirements
@@ -46,7 +50,9 @@ We're scoping out end-to-end encryption key management and media (image/video) h
 - Support millions of concurrent persistent connections without the connection layer becoming the bottleneck.
 
 <Callout type="tip" title="Global ordering is not the goal">
-We only need ordering guarantees within a single conversation, not a global total order across all conversations in the system. This is the difference between a tractable per-conversation sequence counter and a genuinely hard distributed consensus problem — don't over-build this.
+  We only need ordering guarantees within a single conversation, not a global total order across
+  all conversations in the system. This is the difference between a tractable per-conversation
+  sequence counter and a genuinely hard distributed consensus problem — don't over-build this.
 </Callout>
 
 ## Capacity Estimation
@@ -64,11 +70,15 @@ Assume 50M daily active users, each sending an average of 40 messages/day (heavi
 <Capacity
   title="Back-of-the-envelope"
   items={[
-    { label: "Messages sent / day", value: "2B", note: "50M DAU x 40 msgs/day" },
-    { label: "Delivery events / day", value: "~15B", note: "fan-out + receipts + presence" },
-    { label: "Send QPS (peak)", value: "~70,000/s", note: "3x evening peak" },
-    { label: "Concurrent connections", value: "~2M", note: "~25KB/conn ≈ 50GB fleet-wide" },
-    { label: "Message storage / year", value: "~182 TB", note: "250 bytes/message, pre-replication" }
+    { label: 'Messages sent / day', value: '2B', note: '50M DAU x 40 msgs/day' },
+    { label: 'Delivery events / day', value: '~15B', note: 'fan-out + receipts + presence' },
+    { label: 'Send QPS (peak)', value: '~70,000/s', note: '3x evening peak' },
+    { label: 'Concurrent connections', value: '~2M', note: '~25KB/conn ≈ 50GB fleet-wide' },
+    {
+      label: 'Message storage / year',
+      value: '~182 TB',
+      note: '250 bytes/message, pre-replication',
+    },
   ]}
 />
 
@@ -135,7 +145,7 @@ Content-Type: application/json
 }
 ```
 
-`clientMsgId` is generated client-side before the network round trip and is the basis for client-side idempotency — if the client doesn't see an ack within a timeout, it resends with the *same* `clientMsgId`, and the server treats a duplicate as a no-op that just re-returns the original ack.
+`clientMsgId` is generated client-side before the network round trip and is the basis for client-side idempotency — if the client doesn't see an ack within a timeout, it resends with the _same_ `clientMsgId`, and the server treats a duplicate as a no-op that just re-returns the original ack.
 
 ## Data Model
 
@@ -178,11 +188,11 @@ CREATE TABLE delivery_receipts (
 
 The `messages` table is keyed by `(conversation_id, sequence)`, not a globally unique id alone — this is the load-bearing design decision. Partitioning storage by `conversation_id` means every conversation's messages live together and its `sequence` column gives a cheap, per-partition total order, so "give me the next 50 messages after sequence 4820" is a simple range scan on one shard, never a cross-shard merge.
 
-| Field | Purpose |
-|---|---|
-| `sequence` | Monotonic per-conversation counter — the ordering primitive the whole system relies on |
-| `client_msg_id` unique index | Client-side idempotency; retried sends collapse to one row |
-| `conversation_members.last_read_seq` | Cheap "unread count" computation without scanning `delivery_receipts` |
+| Field                                | Purpose                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------- |
+| `sequence`                           | Monotonic per-conversation counter — the ordering primitive the whole system relies on |
+| `client_msg_id` unique index         | Client-side idempotency; retried sends collapse to one row                             |
+| `conversation_members.last_read_seq` | Cheap "unread count" computation without scanning `delivery_receipts`                  |
 
 ## High-Level Architecture
 
@@ -211,8 +221,16 @@ This registry is the crux of routing: sending a message doesn't require knowing 
 
 Every conversation needs a single point that assigns monotonically increasing sequence numbers to its messages, because two clients racing to send at the same instant need a deterministic, agreed-upon order that every participant's client will render identically. We shard this by `conversation_id` — each conversation is deterministically owned by one sequencer shard (consistent hashing), so within a shard, assigning the next sequence number is a simple, uncontended increment (`SELECT nextval` equivalent, or an atomic Redis `INCR` backed by periodic snapshot to the durable store).
 
-<Decision title="Shard the sequencer by conversation_id, not globally" choice="Consistent hashing of conversation_id to sequencer shard, each shard owning an independent counter space">
-A single global sequence counter would need every message in the entire system to serialize through one component — an obvious bottleneck at 70,000 sends/sec peak. Sharding by conversation means unrelated conversations never contend with each other, and the sequencer's total throughput scales horizontally with shard count. The cost is that sequence numbers are only meaningful within a conversation, never comparable across conversations — which is fine, because nothing in the product needs a global ordering (see Requirements).
+<Decision
+  title="Shard the sequencer by conversation_id, not globally"
+  choice="Consistent hashing of conversation_id to sequencer shard, each shard owning an independent counter space"
+>
+  A single global sequence counter would need every message in the entire system to serialize
+  through one component — an obvious bottleneck at 70,000 sends/sec peak. Sharding by
+  conversation means unrelated conversations never contend with each other, and the sequencer's
+  total throughput scales horizontally with shard count. The cost is that sequence numbers are
+  only meaningful within a conversation, never comparable across conversations — which is fine,
+  because nothing in the product needs a global ordering (see Requirements).
 </Decision>
 
 ### Delivery guarantees and client-side dedup
@@ -228,7 +246,12 @@ Read receipts are just another message type flowing through the same pipe (`rece
 Typing indicators skip persistence entirely — they're pure pub/sub through the routing layer with no database write at all, TTL'd at a few seconds on the receiving client so a dropped "stopped typing" event self-heals instead of leaving a stuck "is typing…" indicator.
 
 <Callout type="insight">
-The pattern across receipts and typing indicators is the same: identify which parts of the "message" concept actually need the strong durability and ordering guarantees (message content) and which only need best-effort, ephemeral delivery (typing, and largely receipts) — then give each the guarantee it needs, not the strongest guarantee available. Treating everything with message-content-level rigor is the most common way these systems become slower than they need to be.
+  The pattern across receipts and typing indicators is the same: identify which parts of the
+  "message" concept actually need the strong durability and ordering guarantees (message
+  content) and which only need best-effort, ephemeral delivery (typing, and largely receipts) —
+  then give each the guarantee it needs, not the strongest guarantee available. Treating
+  everything with message-content-level rigor is the most common way these systems become slower
+  than they need to be.
 </Callout>
 
 ### Multi-device fan-out
@@ -237,17 +260,21 @@ A user logged in on both phone and web is really two connections under one `user
 
 ## Failure Handling
 
-| Failure | Detection | Response |
-|---|---|---|
-| Connection gateway instance crashes | Health check fails, LB deregisters | All connections on that instance drop; clients auto-reconnect with backoff, resume from last known sequence per conversation |
-| Sequencer shard unavailable | Write timeout on sequence assignment | Sender's client sees a `send` timeout, retries with same `clientMsgId`; no message is lost because none was ever assigned a sequence, so there's nothing to reconcile |
-| Routing registry (Redis) unavailable | Timeout on lookup | Fan-out falls back to broadcasting to all gateway instances (each checks its local connection map) — more expensive, but correct; registry unavailability degrades performance, not correctness |
-| Push notification bridge down | Delivery failure from provider | Message stays durably queued; delivered on next successful reconnect regardless — push is a convenience wake-up mechanism, not the delivery guarantee itself |
-| Network partition between client and gateway | Missed WebSocket ping/pong heartbeat | Gateway closes the connection after a grace period, deregisters from routing; client reconnects and catches up via sequence-based range read |
-| Duplicate message delivery | Client detects repeated `serverMsgId` | Silently deduped client-side; no server action needed, this is expected at-least-once behavior |
+| Failure                                      | Detection                             | Response                                                                                                                                                                                        |
+| -------------------------------------------- | ------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Connection gateway instance crashes          | Health check fails, LB deregisters    | All connections on that instance drop; clients auto-reconnect with backoff, resume from last known sequence per conversation                                                                    |
+| Sequencer shard unavailable                  | Write timeout on sequence assignment  | Sender's client sees a `send` timeout, retries with same `clientMsgId`; no message is lost because none was ever assigned a sequence, so there's nothing to reconcile                           |
+| Routing registry (Redis) unavailable         | Timeout on lookup                     | Fan-out falls back to broadcasting to all gateway instances (each checks its local connection map) — more expensive, but correct; registry unavailability degrades performance, not correctness |
+| Push notification bridge down                | Delivery failure from provider        | Message stays durably queued; delivered on next successful reconnect regardless — push is a convenience wake-up mechanism, not the delivery guarantee itself                                    |
+| Network partition between client and gateway | Missed WebSocket ping/pong heartbeat  | Gateway closes the connection after a grace period, deregisters from routing; client reconnects and catches up via sequence-based range read                                                    |
+| Duplicate message delivery                   | Client detects repeated `serverMsgId` | Silently deduped client-side; no server action needed, this is expected at-least-once behavior                                                                                                  |
 
 <Callout type="warning">
-Don't let "the recipient is offline" branch into different code from "the recipient is online but the gateway push failed." Both are just "the message didn't reach a live connection right now," and the recovery is identical: it's durably stored, and the client will catch up via sequence range read on its next successful connection. Two code paths for the same outcome is where subtle message-loss bugs get introduced.
+  Don't let "the recipient is offline" branch into different code from "the recipient is online
+  but the gateway push failed." Both are just "the message didn't reach a live connection right
+  now," and the recovery is identical: it's durably stored, and the client will catch up via
+  sequence range read on its next successful connection. Two code paths for the same outcome is
+  where subtle message-loss bugs get introduced.
 </Callout>
 
 ## Scaling
@@ -271,8 +298,16 @@ At 182 TB/year pre-replication, message storage moves to a wide-column store (Ca
 <Tradeoff
   optionA="WebSocket persistent connections"
   optionB="HTTP long-polling"
-  a={["True bidirectional push, lowest latency for server-initiated messages", "Higher per-connection resource cost, needs sticky routing infrastructure", "Requires a connection-aware fan-out/routing layer"]}
-  b={["Works everywhere without special infrastructure, simpler load balancing", "Higher latency (poll interval) and higher request overhead per message", "Doesn't scale well past moderate concurrency due to repeated connection setup"]}
+  a={[
+    'True bidirectional push, lowest latency for server-initiated messages',
+    'Higher per-connection resource cost, needs sticky routing infrastructure',
+    'Requires a connection-aware fan-out/routing layer',
+  ]}
+  b={[
+    'Works everywhere without special infrastructure, simpler load balancing',
+    'Higher latency (poll interval) and higher request overhead per message',
+    "Doesn't scale well past moderate concurrency due to repeated connection setup",
+  ]}
   recommendation="WebSockets for the primary client connection given our sub-200ms latency requirement and scale; long-polling remains a useful fallback for clients or networks that block WebSocket upgrades."
 />
 

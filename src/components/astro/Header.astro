@@ -87,14 +87,20 @@ const current = navigation.find((item) => !item.action && isActiveRoute(item.hre
 </script>
 
 <style>
+  /* Glass, properly: saturated blur, a hairline of light along the
+     bottom edge, and a faint inner highlight so the bar has an edge
+     rather than just looking translucent. */
   .header {
     position: sticky;
     top: 0;
-    z-index: 40;
+    z-index: var(--z-header);
     height: var(--header-height);
-    border-bottom: 1px solid var(--border-subtle);
-    background: color-mix(in oklab, var(--bg-primary) 82%, transparent);
-    backdrop-filter: blur(12px);
+    background: color-mix(in oklab, var(--bg-primary) 72%, transparent);
+    backdrop-filter: blur(16px) saturate(150%);
+    -webkit-backdrop-filter: blur(16px) saturate(150%);
+    box-shadow:
+      inset 0 1px 0 color-mix(in oklab, var(--text-primary) 5%, transparent),
+      inset 0 -1px 0 var(--border-subtle);
   }
 
   .header-inner {
@@ -146,9 +152,9 @@ const current = navigation.find((item) => !item.action && isActiveRoute(item.hre
     place-items: center;
     width: 1.5rem;
     height: 1.5rem;
-    border-radius: 5px;
-    border: 1px solid var(--border-default);
-    background: var(--surface);
+    border-radius: var(--radius-sm);
+    border: 1px solid color-mix(in oklab, var(--pillar) 25%, var(--border-default));
+    background: linear-gradient(140deg, var(--pillar-wash), transparent), var(--surface);
     font-family: var(--font-mono);
     font-size: 0.625rem;
     font-weight: 600;
@@ -170,8 +176,8 @@ const current = navigation.find((item) => !item.action && isActiveRoute(item.hre
     gap: 0.5rem;
     margin: 0;
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
-    letter-spacing: 0.1em;
+    font-size: var(--text-2xs);
+    letter-spacing: var(--tracking-label);
     text-transform: uppercase;
     color: var(--text-muted);
     white-space: nowrap;
@@ -180,7 +186,7 @@ const current = navigation.find((item) => !item.action && isActiveRoute(item.hre
   }
 
   .header-slash {
-    color: var(--border-strong);
+    color: color-mix(in oklab, var(--pillar) 55%, var(--border-strong));
   }
 
   .header-actions {

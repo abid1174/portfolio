@@ -11,41 +11,41 @@ function themeVariables() {
   const token = (name: string, fallback: string) =>
     css.getPropertyValue(name).trim() || fallback;
 
-  const line = token('--border-strong', '#303950');
-  const text = token('--text-primary', '#e9edf5');
-  const surface = token('--surface-raised', '#131722');
-  const accent = token('--pillar', '#5b8cff');
+  const line = token('--border-strong', '#2d4137');
+  const text = token('--text-primary', '#e8f2ec');
+  const surface = token('--surface-raised', '#0f1814');
+  const accent = token('--pillar', '#4fd493');
 
   return {
     background: 'transparent',
     primaryColor: surface,
     primaryTextColor: text,
     primaryBorderColor: accent,
-    secondaryColor: token('--surface-inset', '#0c0f17'),
+    secondaryColor: token('--surface-inset', '#08110d'),
     tertiaryColor: surface,
     lineColor: line,
-    textColor: token('--text-secondary', '#a3adc2'),
+    textColor: token('--text-secondary', '#a2b6ab'),
     mainBkg: surface,
     nodeBorder: accent,
     clusterBkg: 'transparent',
     clusterBorder: line,
-    edgeLabelBackground: token('--bg-primary', '#07080c'),
-    fontFamily: token('--font-jetbrains', 'ui-monospace') + ', ui-monospace, monospace',
+    edgeLabelBackground: token('--bg-primary', '#050908'),
+    fontFamily: token('--font-geist-mono', 'ui-monospace') + ', ui-monospace, monospace',
     fontSize: '14px',
     actorBkg: surface,
     actorBorder: accent,
     actorTextColor: text,
     actorLineColor: line,
-    signalColor: token('--text-secondary', '#a3adc2'),
+    signalColor: token('--text-secondary', '#a2b6ab'),
     signalTextColor: text,
     labelBoxBkgColor: surface,
     labelBoxBorderColor: line,
     labelTextColor: text,
     loopTextColor: text,
-    noteBkgColor: token('--surface-inset', '#0c0f17'),
+    noteBkgColor: token('--surface-inset', '#08110d'),
     noteBorderColor: line,
     noteTextColor: text,
-    sequenceNumberColor: token('--text-inverted', '#07080c'),
+    sequenceNumberColor: token('--text-inverted', '#04120b'),
   };
 }
 
@@ -79,7 +79,8 @@ export default function MermaidDiagram({ chart, id }: MermaidDiagramProps) {
         if (cancelled || !containerRef.current) return;
         containerRef.current.innerHTML = svg;
         setStatus('ready');
-      } catch {
+      } catch (error) {
+        if (import.meta.env.DEV) console.error('[mermaid]', error);
         if (!cancelled) setStatus('error');
       }
     }

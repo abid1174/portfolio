@@ -19,7 +19,6 @@ const entries = await ContentRepository.all();
   <div class="page">
     <SectionHeader
       level="page"
-      eyebrow="Saved for later"
       title="Bookmarks"
       description="Your reading list, kept in this browser's local storage. Nothing is sent anywhere, and clearing site data clears the list."
     />
@@ -88,16 +87,17 @@ const entries = await ContentRepository.all();
 
   .empty-title {
     margin: 0;
-    font-size: 1.0625rem;
+    font-family: var(--font-display);
+    font-size: var(--text-lg);
     font-weight: 600;
     color: var(--text-primary);
   }
 
   .empty-body {
-    margin: 0.5rem auto 0;
+    margin: 0.55rem auto 0;
     max-width: 42ch;
-    font-size: 0.9375rem;
-    line-height: 1.6;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
     color: var(--text-muted);
   }
 
@@ -110,9 +110,9 @@ const entries = await ContentRepository.all();
   }
 
   .empty-link {
-    padding: 0.35rem 0.8rem;
+    padding: 0.4rem 0.85rem;
     border: 1px solid var(--border-subtle);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-md);
     background: var(--surface);
     font-size: 0.8125rem;
     color: var(--text-secondary);

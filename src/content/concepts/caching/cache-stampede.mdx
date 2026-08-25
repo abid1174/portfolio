@@ -1,15 +1,16 @@
 ---
-title: "What is a Cache Stampede?"
-description: "A cache stampede happens when a popular cached value expires and every waiting request rushes the origin at once, turning a cache miss into a self-inflicted denial of service."
-type: "concept"
-category: "Caching"
-tags: ["Caching", "Redis", "Performance", "Scalability"]
-difficulty: "intermediate"
+title: 'What is a Cache Stampede?'
+description: 'A cache stampede happens when a popular cached value expires and every waiting request rushes the origin at once, turning a cache miss into a self-inflicted denial of service.'
+type: 'concept'
+category: 'Caching'
+tags: ['Caching', 'Redis', 'Performance', 'Scalability']
+difficulty: 'intermediate'
 readingTime: 8
-publishedAt: "2026-06-08"
-updatedAt: "2026-06-20"
+publishedAt: '2026-06-08'
+updatedAt: '2026-06-20'
 featured: false
-related: ["concepts/database-index", "concepts/consistent-hashing", "system-design/rate-limiter"]
+related:
+  ['concepts/database-index', 'concepts/consistent-hashing', 'system-design/rate-limiter']
 ---
 
 A cache exists to protect your database from load. A cache stampede is the failure mode where the cache stops doing that job at exactly the worst moment: a hot key expires, and every one of the thousand requests that were relying on it hits the origin simultaneously, often enough to take the origin down.
@@ -34,7 +35,9 @@ A database that comfortably serves the cached read load can be caught completely
 The keys most likely to cause a stampede are exactly the ones you'd assume are safest: the hottest, most frequently accessed data. A rarely-requested key expiring causes at most a handful of redundant queries. A viral product page, a trending post, a homepage feed — anything serving hundreds or thousands of requests per second — turns every single TTL expiration into a burst proportional to that traffic. This is why stampedes tend to appear suddenly in production on your most-loved content, not your long tail.
 
 <Callout type="warning">
-Stampedes often masquerade as a database performance problem. The graphs show a spike in DB load and slow queries, and the instinct is to add an index or scale the database — when the actual fix belongs entirely in the caching layer.
+  Stampedes often masquerade as a database performance problem. The graphs show a spike in DB
+  load and slow queries, and the instinct is to add an index or scale the database — when the
+  actual fix belongs entirely in the caching layer.
 </Callout>
 
 ## Mitigation: Locking (Single-Flight)
@@ -47,12 +50,12 @@ async function getProduct(id: string) {
   if (cached) return JSON.parse(cached);
 
   const lockKey = `lock:product:${id}`;
-  const gotLock = await redis.set(lockKey, "1", "NX", "EX", 10);
+  const gotLock = await redis.set(lockKey, '1', 'NX', 'EX', 10);
 
   if (gotLock) {
     try {
       const product = await db.products.findById(id);
-      await redis.set(`product:${id}`, JSON.stringify(product), "EX", 300);
+      await redis.set(`product:${id}`, JSON.stringify(product), 'EX', 300);
       return product;
     } finally {
       await redis.del(lockKey);
@@ -87,15 +90,18 @@ This header tells a compliant cache: serve from cache for 300 seconds, and for u
 
 ## Comparing the Options
 
-| Strategy | Blocks the requester | Extra infra needed | Best when |
-|---|---|---|---|
-| Mutex / single-flight lock | Briefly, for non-lock-holders | Distributed lock (Redis `SETNX`) | Strong consistency preferred over staleness |
-| Probabilistic early expiration | No | Small metadata per cache entry | High-traffic keys, some staleness tolerable |
-| Stale-while-revalidate | No | Cache/CDN support for the directive | Read-heavy, latency-sensitive endpoints |
-| No TTL, explicit invalidation | No | Reliable invalidation on writes | Data that changes on a known event, not on a clock |
+| Strategy                       | Blocks the requester          | Extra infra needed                  | Best when                                          |
+| ------------------------------ | ----------------------------- | ----------------------------------- | -------------------------------------------------- |
+| Mutex / single-flight lock     | Briefly, for non-lock-holders | Distributed lock (Redis `SETNX`)    | Strong consistency preferred over staleness        |
+| Probabilistic early expiration | No                            | Small metadata per cache entry      | High-traffic keys, some staleness tolerable        |
+| Stale-while-revalidate         | No                            | Cache/CDN support for the directive | Read-heavy, latency-sensitive endpoints            |
+| No TTL, explicit invalidation  | No                            | Reliable invalidation on writes     | Data that changes on a known event, not on a clock |
 
 <Callout type="insight">
-Notice the last row: the simplest fix for a lot of stampede-prone caches is to stop expiring on a timer at all. If you can invalidate the cache precisely when the underlying data changes — on the write path — you remove the recurring expiration event that causes stampedes in the first place. TTLs are a safety net for invalidation you don't trust, not a substitute for it.
+  Notice the last row: the simplest fix for a lot of stampede-prone caches is to stop expiring
+  on a timer at all. If you can invalidate the cache precisely when the underlying data changes
+  — on the write path — you remove the recurring expiration event that causes stampedes in the
+  first place. TTLs are a safety net for invalidation you don't trust, not a substitute for it.
 </Callout>
 
 ## Jitter Alone Isn't Enough

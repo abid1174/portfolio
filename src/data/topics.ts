@@ -79,13 +79,6 @@ export const pillarList: PillarMeta[] = [
 export const difficulties = ['beginner', 'intermediate', 'advanced'] as const;
 export type Difficulty = (typeof difficulties)[number];
 
-/** Accent token used for each difficulty chip. */
-export const difficultyAccent: Record<Difficulty, string> = {
-  beginner: 'var(--accent-cyan)',
-  intermediate: 'var(--accent-amber)',
-  advanced: 'var(--accent-rose)',
-};
-
 /**
  * Preferred display order for categories. Categories not listed here
  * still render — they simply sort alphabetically after these.

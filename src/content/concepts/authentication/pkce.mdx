@@ -1,15 +1,15 @@
 ---
-title: "What is PKCE?"
-description: "PKCE hardens the OAuth 2.0 authorization code flow against interception attacks by binding the authorization request to the token exchange with a one-time secret."
-type: "concept"
-category: "Authentication"
-tags: ["OAuth", "Security", "Authentication"]
-difficulty: "beginner"
+title: 'What is PKCE?'
+description: 'PKCE hardens the OAuth 2.0 authorization code flow against interception attacks by binding the authorization request to the token exchange with a one-time secret.'
+type: 'concept'
+category: 'Authentication'
+tags: ['OAuth', 'Security', 'Authentication']
+difficulty: 'beginner'
 readingTime: 7
-publishedAt: "2026-04-03"
-updatedAt: "2026-04-03"
+publishedAt: '2026-04-03'
+updatedAt: '2026-04-03'
 featured: true
-related: ["concepts/oauth-2", "concepts/jwt", "system-design/rate-limiter"]
+related: ['concepts/oauth-2', 'concepts/jwt', 'system-design/rate-limiter']
 ---
 
 PKCE (pronounced "pixie", short for Proof Key for Code Exchange) is an extension to the OAuth 2.0 authorization code flow. It exists because a huge class of clients — single-page apps, mobile apps, CLIs — cannot keep a secret, and the original authorization code flow was designed assuming they could.
@@ -25,27 +25,24 @@ Public clients don't have that luxury. A mobile app's binary can be decompiled. 
 PKCE closes that hole by having the client generate a fresh, random secret for every single authorization request, instead of reusing a static one. This secret is called the `code_verifier`. The client also derives a `code_challenge` from it and sends that in the initial authorization request. Only at the very end, when exchanging the code for tokens, does it reveal the raw verifier.
 
 ```ts
-import { webcrypto as crypto } from "node:crypto";
+import { webcrypto as crypto } from 'node:crypto';
 
 function base64url(bytes: Uint8Array): string {
   return Buffer.from(bytes)
-    .toString("base64")
-    .replace(/\+/g, "-")
-    .replace(/\//g, "_")
-    .replace(/=+$/, "");
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 export async function createPkcePair() {
   const verifierBytes = crypto.getRandomValues(new Uint8Array(32));
   const codeVerifier = base64url(verifierBytes);
 
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
-    new TextEncoder().encode(codeVerifier)
-  );
+  const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
   const codeChallenge = base64url(new Uint8Array(digest));
 
-  return { codeVerifier, codeChallenge, method: "S256" as const };
+  return { codeVerifier, codeChallenge, method: 'S256' as const };
 }
 ```
 
@@ -73,21 +70,30 @@ Notice the challenge travels over the redirect (visible to anything watching the
 
 The spec defines two challenge methods. You should only ever use one of them.
 
-| Method | How challenge is derived | Security |
-|---|---|---|
-| `S256` | `BASE64URL(SHA256(verifier))` | Verifier never appears in the authorization request, even hashed reversal isn't feasible |
-| `plain` | `challenge = verifier` | Challenge equals the verifier, so anything that can see the authorize request sees the secret |
+| Method  | How challenge is derived      | Security                                                                                      |
+| ------- | ----------------------------- | --------------------------------------------------------------------------------------------- |
+| `S256`  | `BASE64URL(SHA256(verifier))` | Verifier never appears in the authorization request, even hashed reversal isn't feasible      |
+| `plain` | `challenge = verifier`        | Challenge equals the verifier, so anything that can see the authorize request sees the secret |
 
 <Callout type="warning" title="Never use plain unless you have no choice">
-`plain` exists only for clients that can't compute SHA-256, which in practice means almost nobody today. If a library or SDK defaults to `plain`, that's a strong signal to look for a better one. Always pass `S256` explicitly.
+  `plain` exists only for clients that can't compute SHA-256, which in practice means almost
+  nobody today. If a library or SDK defaults to `plain`, that's a strong signal to look for a
+  better one. Always pass `S256` explicitly.
 </Callout>
 
 ## Where to Store the Verifier
 
 The verifier has to survive the round trip from "app opens the browser" to "browser redirects back to the app," which for a SPA usually means a page navigation, and for a native app means switching to a system browser and back.
 
-<Decision title="Store the code verifier in memory" choice="sessionStorage, cleared immediately after the exchange">
-For a SPA, `sessionStorage` survives a full-page redirect but is scoped to the tab and cleared when it closes, which limits the exposure window compared to `localStorage`. It's still readable by any script on the page, so it's not a defense against XSS — PKCE protects against code interception, not a compromised client. Native apps have it easier: they can hold the verifier in process memory for the lifetime of the login attempt.
+<Decision
+  title="Store the code verifier in memory"
+  choice="sessionStorage, cleared immediately after the exchange"
+>
+  For a SPA, `sessionStorage` survives a full-page redirect but is scoped to the tab and cleared
+  when it closes, which limits the exposure window compared to `localStorage`. It's still
+  readable by any script on the page, so it's not a defense against XSS — PKCE protects against
+  code interception, not a compromised client. Native apps have it easier: they can hold the
+  verifier in process memory for the lifetime of the login attempt.
 </Decision>
 
 ## PKCE Is Not Optional Anymore
@@ -95,7 +101,9 @@ For a SPA, `sessionStorage` survives a full-page redirect but is scoped to the t
 Early guidance treated PKCE as an extra layer for public clients specifically. Current best practice — reflected in the OAuth 2.1 draft — is to require PKCE for every client, confidential or not. It costs almost nothing to implement and it closes the authorization code injection attack even for server-side apps, where an attacker who compromises a redirect URI or a network path could otherwise inject their own authorization code into a victim's session.
 
 <Callout type="insight">
-Think of PKCE less as a "public client fix" and more as a general defense against code substitution attacks. The client secret proves who you are; PKCE proves this specific token request came from the same party that started this specific login attempt.
+  Think of PKCE less as a "public client fix" and more as a general defense against code
+  substitution attacks. The client secret proves who you are; PKCE proves this specific token
+  request came from the same party that started this specific login attempt.
 </Callout>
 
 ## Common Implementation Mistakes
@@ -121,10 +129,11 @@ code_verifier=dBjftJeZ4CVP-mB92K27uhbUJU1p1r_wW1gFWFOEjXk
 ```
 
 <Callout type="tip">
-If you're evaluating an auth provider or library, check whether it enforces PKCE server-side (rejecting authorization requests without a `code_challenge`) rather than just supporting it client-side. Optional PKCE protects clients that opt in; mandatory PKCE protects everyone.
+  If you're evaluating an auth provider or library, check whether it enforces PKCE server-side
+  (rejecting authorization requests without a `code_challenge`) rather than just supporting it
+  client-side. Optional PKCE protects clients that opt in; mandatory PKCE protects everyone.
 </Callout>
 
 ## Takeaway
 
 PKCE turns a static, guessable client secret into a fresh, per-request proof of possession. The client generates a random verifier, sends a hash of it up front, and only reveals the original value when redeeming the code — so an intercepted authorization code is useless without the verifier that never left the client until that final step. Use `S256`, generate the verifier with a secure random source, keep `state` around for CSRF protection, and treat PKCE as the default for every client type, not just the public ones.
-

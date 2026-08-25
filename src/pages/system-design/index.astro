@@ -4,11 +4,8 @@ import ContentLibrary from '../../components/astro/ContentLibrary.astro';
 import SectionHeader from '../../components/astro/SectionHeader.astro';
 import { breadcrumbJsonLd } from '../../lib/metadata';
 import { pillars } from '../../data/topics';
-import { ContentRepository } from '../../lib/content';
 
 const pillar = pillars['system-design'];
-const entries = await ContentRepository.byPillar('system-design');
-const totalMinutes = entries.reduce((sum, entry) => sum + entry.readingTime, 0);
 ---
 
 <PageLayout
@@ -21,7 +18,6 @@ const totalMinutes = entries.reduce((sum, entry) => sum + entry.readingTime, 0);
   <div class="page">
     <SectionHeader
       level="page"
-      eyebrow={`${entries.length} walkthroughs · ${totalMinutes} minutes of reading`}
       title="System Design Practices"
       description={pillar.heroDescription}
     />

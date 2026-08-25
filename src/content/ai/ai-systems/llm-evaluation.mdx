@@ -1,15 +1,15 @@
 ---
-title: "LLM Evaluation"
-description: "Building eval sets, choosing between deterministic checks and model graders, and catching regressions before a prompt change ships."
-type: "ai"
-category: "Evaluation"
-tags: ["Evaluation", "LLM", "Observability", "Reliability"]
-difficulty: "advanced"
+title: 'LLM Evaluation'
+description: 'Building eval sets, choosing between deterministic checks and model graders, and catching regressions before a prompt change ships.'
+type: 'ai'
+category: 'Evaluation'
+tags: ['Evaluation', 'LLM', 'Observability', 'Reliability']
+difficulty: 'advanced'
 readingTime: 14
-publishedAt: "2026-08-10"
-updatedAt: "2026-08-22"
+publishedAt: '2026-08-10'
+updatedAt: '2026-08-22'
 featured: false
-related: ["ai/rag", "ai/ai-agents", "ai/prompt-engineering"]
+related: ['ai/rag', 'ai/ai-agents', 'ai/prompt-engineering']
 ---
 
 "It looks better in my testing" is not an evaluation strategy, and it's exactly how prompt and model changes quietly regress production quality. LLM evaluation is the discipline of turning "seems good" into a number you can track across changes — the same instinct that made unit tests non-negotiable for regular code, applied to a component whose output is nondeterministic by design.
@@ -19,7 +19,9 @@ related: ["ai/rag", "ai/ai-agents", "ai/prompt-engineering"]
 Manually reading transcripts catches obvious failures and misses everything subtle — a retrieval system that answers 90% of common questions well and silently fails on a long tail you never happened to try. Worse, it doesn't survive a change: without a fixed, repeatable set of inputs and a scoring method, there's no way to say whether a new prompt or a new model version made things better or worse, only whether it feels different on the handful of examples you happened to glance at.
 
 <Callout type="note">
-An eval is three things: a fixed set of inputs, a way to score the output for each one, and a way to run that scoring automatically and repeatably. Missing any one of the three means you're back to reading transcripts by hand.
+  An eval is three things: a fixed set of inputs, a way to score the output for each one, and a
+  way to run that scoring automatically and repeatably. Missing any one of the three means
+  you're back to reading transcripts by hand.
 </Callout>
 
 ## Building an Eval Set
@@ -44,20 +46,22 @@ eval_cases = [
 ```
 
 <Callout type="tip">
-Weight your eval set toward the hard cases, not the easy majority. A set that's 90% straightforward queries will show near-perfect scores that don't move when you make a real improvement, because the easy cases were already passing.
+  Weight your eval set toward the hard cases, not the easy majority. A set that's 90%
+  straightforward queries will show near-perfect scores that don't move when you make a real
+  improvement, because the easy cases were already passing.
 </Callout>
 
 ## Deterministic Checks vs Model Graders
 
 Not every output needs a model to grade it. Structural properties — is the output valid JSON, does it match a required schema, is a required field present, does a numeric answer fall within a tolerance — should be checked with plain code. It's faster, free, perfectly reproducible, and has zero risk of the grader itself being wrong in a way that's hard to detect.
 
-| Check type | Use for | Cost |
-|---|---|---|
-| Exact match / regex | Structured fields, classification labels | Free, instant |
-| Schema validation | JSON output shape | Free, instant |
-| Deterministic function | Numeric tolerance, business rule checks | Free, instant |
-| Embedding similarity | Loose semantic match to a reference answer | Cheap, fast |
-| LLM-as-judge | Open-ended quality, faithfulness, tone | Slower, costs tokens, needs its own validation |
+| Check type             | Use for                                    | Cost                                           |
+| ---------------------- | ------------------------------------------ | ---------------------------------------------- |
+| Exact match / regex    | Structured fields, classification labels   | Free, instant                                  |
+| Schema validation      | JSON output shape                          | Free, instant                                  |
+| Deterministic function | Numeric tolerance, business rule checks    | Free, instant                                  |
+| Embedding similarity   | Loose semantic match to a reference answer | Cheap, fast                                    |
+| LLM-as-judge           | Open-ended quality, faithfulness, tone     | Slower, costs tokens, needs its own validation |
 
 Reach for a model grader only once deterministic checks run out — for genuinely open-ended qualities like "is this answer faithful to the retrieved context" or "does this response match our support tone," where there's no fixed string to match against.
 
@@ -80,7 +84,10 @@ AI response: "Your refund will be processed within 5-7 business days once approv
 />
 
 <Callout type="warning">
-Validate the judge itself against a small set of human-labeled examples before trusting its scores at scale. A judge model that agrees with human graders 70% of the time is producing a metric with real noise in it — know that error rate before you use the metric to gate a release.
+  Validate the judge itself against a small set of human-labeled examples before trusting its
+  scores at scale. A judge model that agrees with human graders 70% of the time is producing a
+  metric with real noise in it — know that error rate before you use the metric to gate a
+  release.
 </Callout>
 
 ## Regression Testing Prompts
@@ -101,7 +108,10 @@ Statistical noise is easy to underestimate here. Sampling temperature and inhere
 Agents need evaluation at two levels: the final outcome (did the task actually get completed correctly) and the trajectory (were the intermediate steps reasonable, or did the agent get the right answer through an unreliable path that will fail differently next time). A trajectory eval checks things like: did it call the right tools, in a sensible order, without redundant calls, and did it recover reasonably when a tool returned an error.
 
 <Callout type="insight" title="Outcome-only evaluation hides fragility">
-An agent that reaches the correct answer by retrying a failing tool call five times looks identical to a robust agent if you only score the final outcome. Trajectory-level checks are what catch that the underlying behavior is fragile before it shows up as a cost or latency incident in production.
+  An agent that reaches the correct answer by retrying a failing tool call five times looks
+  identical to a robust agent if you only score the final outcome. Trajectory-level checks are
+  what catch that the underlying behavior is fragile before it shows up as a cost or latency
+  incident in production.
 </Callout>
 
 ## Takeaway

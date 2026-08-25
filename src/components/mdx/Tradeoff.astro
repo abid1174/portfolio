@@ -20,14 +20,14 @@ const { optionA, optionB, a = [], b = [], recommendation } = Astro.props;
 
   <div class="tradeoff-grid">
     <div class="tradeoff-col">
-      <h4 class="tradeoff-option" style="--opt:var(--accent-blue)">{optionA}</h4>
+      <h4 class="tradeoff-option" style="--opt:var(--accent-emerald)">{optionA}</h4>
       <ul>
         {a.map((point) => <li>{point}</li>)}
       </ul>
     </div>
     <div class="tradeoff-divider" aria-hidden="true"><span>vs</span></div>
     <div class="tradeoff-col">
-      <h4 class="tradeoff-option" style="--opt:var(--accent-purple)">{optionB}</h4>
+      <h4 class="tradeoff-option" style="--opt:var(--accent-lime)">{optionB}</h4>
       <ul>
         {b.map((point) => <li>{point}</li>)}
       </ul>
@@ -149,14 +149,14 @@ const { optionA, optionB, a = [], b = [], recommendation } = Astro.props;
     margin: 0;
     padding: 0.8rem 1.1rem;
     border-top: 1px solid var(--border-subtle);
-    background: var(--wash-cyan);
+    background: var(--wash-teal);
     font-size: 0.875rem;
     line-height: 1.6;
     color: var(--text-secondary);
     max-width: none;
   }
   .tradeoff-rec :global(svg) {
-    color: var(--accent-cyan);
+    color: var(--accent-teal);
     flex-shrink: 0;
     margin-top: 0.3em;
   }

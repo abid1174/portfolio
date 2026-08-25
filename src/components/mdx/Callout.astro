@@ -11,11 +11,16 @@ interface Props {
 const { type = 'note', title } = Astro.props;
 
 const variants = {
-  note: { icon: Info, accent: 'var(--accent-blue)', wash: 'var(--wash-blue)', label: 'Note' },
+  note: {
+    icon: Info,
+    accent: 'var(--accent-emerald)',
+    wash: 'var(--wash-emerald)',
+    label: 'Note',
+  },
   tip: {
     icon: Lightbulb,
-    accent: 'var(--accent-cyan)',
-    wash: 'var(--wash-cyan)',
+    accent: 'var(--accent-teal)',
+    wash: 'var(--wash-teal)',
     label: 'Tip',
   },
   warning: {
@@ -32,8 +37,8 @@ const variants = {
   },
   insight: {
     icon: Sparkles,
-    accent: 'var(--accent-purple)',
-    wash: 'var(--wash-purple)',
+    accent: 'var(--accent-lime)',
+    wash: 'var(--wash-lime)',
     label: 'Insight',
   },
 } as const;

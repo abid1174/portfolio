@@ -4,10 +4,8 @@ import ContentLibrary from '../../components/astro/ContentLibrary.astro';
 import SectionHeader from '../../components/astro/SectionHeader.astro';
 import { breadcrumbJsonLd } from '../../lib/metadata';
 import { pillars } from '../../data/topics';
-import { ContentRepository } from '../../lib/content';
 
 const pillar = pillars.ai;
-const count = (await ContentRepository.byPillar('ai')).length;
 ---
 
 <PageLayout
@@ -20,7 +18,6 @@ const count = (await ContentRepository.byPillar('ai')).length;
   <div class="page">
     <SectionHeader
       level="page"
-      eyebrow={`${count} entries · Learning in public`}
       title={pillar.label}
       description={pillar.heroDescription}
     />

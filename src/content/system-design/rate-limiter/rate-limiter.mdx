@@ -1,17 +1,18 @@
 ---
-title: "Designing a Rate Limiter"
-description: "Design a distributed rate limiter for an API gateway: algorithm choice, distributed counters, and protecting shared backends under load."
-type: "system-design"
-category: "Scalability"
-tags: ["Scalability", "Redis", "API Design", "Performance"]
-difficulty: "intermediate"
+title: 'Designing a Rate Limiter'
+description: 'Design a distributed rate limiter for an API gateway: algorithm choice, distributed counters, and protecting shared backends under load.'
+type: 'system-design'
+category: 'Scalability'
+tags: ['Scalability', 'Redis', 'API Design', 'Performance']
+difficulty: 'intermediate'
 readingTime: 22
-publishedAt: "2026-05-28"
-updatedAt: "2026-08-10"
+publishedAt: '2026-05-28'
+updatedAt: '2026-08-10'
 featured: true
-diagram: "pipeline"
-scale: "500K requests/sec gateway-wide, 100K unique clients"
-related: ["concepts/circuit-breaker", "concepts/consistent-hashing", "system-design/url-shortener"]
+diagram: 'pipeline'
+scale: '500K requests/sec gateway-wide, 100K unique clients'
+related:
+  ['concepts/circuit-breaker', 'concepts/consistent-hashing', 'system-design/url-shortener']
 ---
 
 A rate limiter is a small idea — reject requests past a threshold — that turns into a genuinely tricky distributed systems problem the moment it has to run correctly across more than one server. This is the design for a rate limiter sitting in front of a large API gateway, protecting both the gateway itself and the backends behind it.
@@ -23,7 +24,9 @@ We're building a rate limiter that sits on the request path of an API gateway se
 The hard part isn't the algorithm — counting requests against a threshold is conceptually trivial. It's making that counting accurate and fast when the counting has to happen consistently across dozens of stateless gateway instances handling the same client's traffic in parallel, without the rate limiter itself becoming the bottleneck it's meant to prevent.
 
 <Callout type="note">
-We're designing the general-purpose gateway rate limiter here, not a specialized abuse/fraud detection system — this component enforces stated, published limits fairly and predictably; it isn't trying to detect malicious intent.
+  We're designing the general-purpose gateway rate limiter here, not a specialized abuse/fraud
+  detection system — this component enforces stated, published limits fairly and predictably; it
+  isn't trying to detect malicious intent.
 </Callout>
 
 ## Requirements
@@ -44,7 +47,11 @@ We're designing the general-purpose gateway rate limiter here, not a specialized
 - Memory-efficient at 100,000 tracked clients with sub-minute windows — this is a lot of small counters updated very frequently.
 
 <Callout type="tip">
-Decide up front whether being slightly over the limit under contention is acceptable. Most API rate limiters intentionally allow soft overshoot (a distributed counter with a few milliseconds of replication lag might let a client through at 1,010 requests instead of exactly 1,000) in exchange for not needing expensive cross-node coordination on every request. This single decision shapes the whole algorithm choice below.
+  Decide up front whether being slightly over the limit under contention is acceptable. Most API
+  rate limiters intentionally allow soft overshoot (a distributed counter with a few
+  milliseconds of replication lag might let a client through at 1,010 requests instead of
+  exactly 1,000) in exchange for not needing expensive cross-node coordination on every request.
+  This single decision shapes the whole algorithm choice below.
 </Callout>
 
 ## Capacity Estimation
@@ -59,11 +66,23 @@ Assume 500,000 requests/second gateway-wide, across 100,000 unique clients, with
 <Capacity
   title="Back-of-the-envelope"
   items={[
-    { label: "Rate checks / sec", value: "500,000/s", note: "one check per gateway request" },
-    { label: "Tracked clients", value: "100,000", note: "2 limit tiers each" },
-    { label: "Counter memory", value: "~3.2 MB", note: "2 tiers x 100K clients x 2 counters x 8B" },
-    { label: "Central store ops (naive)", value: "500,000/s", note: "1 network hop per request if not localized" },
-    { label: "Local check cost", value: "sub-microsecond", note: "vs ~1ms+ network round trip" }
+    { label: 'Rate checks / sec', value: '500,000/s', note: 'one check per gateway request' },
+    { label: 'Tracked clients', value: '100,000', note: '2 limit tiers each' },
+    {
+      label: 'Counter memory',
+      value: '~3.2 MB',
+      note: '2 tiers x 100K clients x 2 counters x 8B',
+    },
+    {
+      label: 'Central store ops (naive)',
+      value: '500,000/s',
+      note: '1 network hop per request if not localized',
+    },
+    {
+      label: 'Local check cost',
+      value: 'sub-microsecond',
+      note: 'vs ~1ms+ network round trip',
+    },
   ]}
 />
 
@@ -146,11 +165,11 @@ CREATE TABLE rate_limit_tiers (
 
 Counter state, per client per tier, lives in Redis as a small set of keys rather than SQL rows:
 
-| Key pattern | Type | Purpose |
-|---|---|---|
-| `rl:{clientId}:{tier}:cur` | Integer, TTL'd | Count in the current window |
-| `rl:{clientId}:{tier}:prev` | Integer | Count in the previous window, used for the sliding-window weighted estimate |
-| `rl:{clientId}:{tier}:window_start` | Timestamp | Anchors which window `cur` belongs to |
+| Key pattern                         | Type           | Purpose                                                                     |
+| ----------------------------------- | -------------- | --------------------------------------------------------------------------- |
+| `rl:{clientId}:{tier}:cur`          | Integer, TTL'd | Count in the current window                                                 |
+| `rl:{clientId}:{tier}:prev`         | Integer        | Count in the previous window, used for the sliding-window weighted estimate |
+| `rl:{clientId}:{tier}:window_start` | Timestamp      | Anchors which window `cur` belongs to                                       |
 
 `rate_limit_tiers` is read-heavy and changes rarely (a tier upgrade is a human or billing-system action, not a per-request event), so it's cached in each gateway instance's local memory with a short TTL and invalidated via a pub/sub message on update — this keeps the 500,000/s hot path from ever touching the configuration store directly.
 
@@ -183,8 +202,17 @@ Four standard algorithms, and the trade-offs between them are the crux of this d
 
 **Token bucket**: each client has a bucket that refills at a steady rate up to a cap; each request consumes a token, and a request with no tokens available is rejected. This naturally supports bursting (a client can spend a large accumulated bucket in one burst) while still enforcing an average rate over time, which fixed and sliding window counters don't do as elegantly.
 
-<Decision title="Sliding window counter for sustained limits, token bucket for burst limits" choice="Two algorithms, one per tier, rather than a single unified approach">
-Sustained limits (1,000/min) care about smoothing out the fixed-window boundary problem cheaply — the sliding window counter's bounded approximation error is an easy trade for its low, constant memory cost. Burst limits (100/10s) exist specifically to allow short bursts while still capping average rate, which is exactly what a token bucket is built for. Using one algorithm for both would either make sustained limiting needlessly bursty or make burst limiting needlessly rigid — the two tiers are solving different problems and deserve different tools.
+<Decision
+  title="Sliding window counter for sustained limits, token bucket for burst limits"
+  choice="Two algorithms, one per tier, rather than a single unified approach"
+>
+  Sustained limits (1,000/min) care about smoothing out the fixed-window boundary problem
+  cheaply — the sliding window counter's bounded approximation error is an easy trade for its
+  low, constant memory cost. Burst limits (100/10s) exist specifically to allow short bursts
+  while still capping average rate, which is exactly what a token bucket is built for. Using one
+  algorithm for both would either make sustained limiting needlessly bursty or make burst
+  limiting needlessly rigid — the two tiers are solving different problems and deserve different
+  tools.
 </Decision>
 
 ### Local caching to avoid a network hop per request
@@ -194,7 +222,11 @@ At 500,000 checks/second, a network round trip to Redis on every request — eve
 This means any single gateway instance decides against a count that's slightly stale relative to the true global count — a client spread evenly across 20 instances could theoretically get up to roughly 20x their limit through in a worst case if every instance's local view lags simultaneously. In practice this is bounded and rare: the sync interval is short, the local counter enforces `limit / instanceCount` as a soft per-instance cap between syncs, and the product accepts a small amount of soft overshoot as the cost of not putting Redis on the hot path.
 
 <Callout type="warning" title="Soft overshoot is a deliberate trade, not a bug">
-If the product requirement is a hard, exact limit — for example, enforcing a paid quota tied to billing — this local-cache approach is the wrong choice; that case needs every check to go through a single authoritative counter (accepting the latency and throughput ceiling that comes with it), or a token-based pre-allocation scheme where instances claim blocks of quota from a central store up front rather than checking per-request.
+  If the product requirement is a hard, exact limit — for example, enforcing a paid quota tied
+  to billing — this local-cache approach is the wrong choice; that case needs every check to go
+  through a single authoritative counter (accepting the latency and throughput ceiling that
+  comes with it), or a token-based pre-allocation scheme where instances claim blocks of quota
+  from a central store up front rather than checking per-request.
 </Callout>
 
 ### Where the rate limiter sits in the request path
@@ -207,16 +239,22 @@ Not every endpoint costs the backend the same amount of work. A `GET /v1/status`
 
 ## Failure Handling
 
-| Failure | Detection | Response |
-|---|---|---|
-| Redis (shared counter store) unavailable | Sync worker connection errors | Gateway instances continue enforcing against their local counters only, resetting to a conservative per-instance cap; degraded accuracy, not degraded availability |
-| Config store unavailable | Local config cache miss on a new client | Fall back to a global default tier (most restrictive reasonable limit) rather than failing the request or allowing unlimited traffic |
-| Local counter cache grows unbounded (many distinct clients) | Memory alert on gateway instance | LRU eviction on the local cache — an evicted client's next request just re-initializes from Redis, costing one network hop instead of zero |
-| Clock skew between gateway instances | Sync reconciliation shows implausible deltas | Window boundaries are computed from a shared, coarse-grained time source (synced via NTP, checked periodically) rather than trusting each instance's raw clock for anything more precise than second-level buckets |
-| Sync worker falls behind (backlog) | Sync queue depth alert | Local-only enforcement continues (correct-ish, per above); if backlog persists past a threshold, alert rather than silently drifting indefinitely |
+| Failure                                                     | Detection                                    | Response                                                                                                                                                                                                           |
+| ----------------------------------------------------------- | -------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Redis (shared counter store) unavailable                    | Sync worker connection errors                | Gateway instances continue enforcing against their local counters only, resetting to a conservative per-instance cap; degraded accuracy, not degraded availability                                                 |
+| Config store unavailable                                    | Local config cache miss on a new client      | Fall back to a global default tier (most restrictive reasonable limit) rather than failing the request or allowing unlimited traffic                                                                               |
+| Local counter cache grows unbounded (many distinct clients) | Memory alert on gateway instance             | LRU eviction on the local cache — an evicted client's next request just re-initializes from Redis, costing one network hop instead of zero                                                                         |
+| Clock skew between gateway instances                        | Sync reconciliation shows implausible deltas | Window boundaries are computed from a shared, coarse-grained time source (synced via NTP, checked periodically) rather than trusting each instance's raw clock for anything more precise than second-level buckets |
+| Sync worker falls behind (backlog)                          | Sync queue depth alert                       | Local-only enforcement continues (correct-ish, per above); if backlog persists past a threshold, alert rather than silently drifting indefinitely                                                                  |
 
-<Callout type="danger" title="Never let the rate limiter become a single point of failure for the whole gateway">
-The most important property of this design is that every failure mode degrades toward "slightly less accurate limiting," never toward "the gateway stops serving requests." A rate limiter that fails closed on its own dependency outage has turned a component meant to protect availability into the biggest threat to it.
+<Callout
+  type="danger"
+  title="Never let the rate limiter become a single point of failure for the whole gateway"
+>
+  The most important property of this design is that every failure mode degrades toward
+  "slightly less accurate limiting," never toward "the gateway stops serving requests." A rate
+  limiter that fails closed on its own dependency outage has turned a component meant to protect
+  availability into the biggest threat to it.
 </Callout>
 
 ## Scaling
@@ -240,8 +278,16 @@ For a gateway deployed across multiple regions, each region's local counters syn
 <Tradeoff
   optionA="Centralized counting (every check hits shared Redis)"
   optionB="Local-first counting with async reconciliation"
-  a={["Exact, immediately consistent limits", "Hard latency floor of a network round trip on every request", "Redis becomes a scaling ceiling and a single dependency on the hot path"]}
-  b={["Sub-microsecond hot-path check, scales with gateway fleet size", "Soft overshoot possible — up to roughly instanceCount x limit in a worst case", "More moving parts: sync workers, eviction, staleness to reason about"]}
+  a={[
+    'Exact, immediately consistent limits',
+    'Hard latency floor of a network round trip on every request',
+    'Redis becomes a scaling ceiling and a single dependency on the hot path',
+  ]}
+  b={[
+    'Sub-microsecond hot-path check, scales with gateway fleet size',
+    'Soft overshoot possible — up to roughly instanceCount x limit in a worst case',
+    'More moving parts: sync workers, eviction, staleness to reason about',
+  ]}
   recommendation="Local-first for general API gateway limiting, where the goal is fairness and backend protection, not exact billing-grade accounting. Reserve centralized counting for the specific limits tied directly to a hard quota or billing guarantee."
 />
 

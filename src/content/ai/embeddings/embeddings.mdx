@@ -1,15 +1,15 @@
 ---
-title: "What are Embeddings?"
-description: "How text becomes a vector, why cosine similarity works as a proxy for meaning, and what actually determines embedding quality."
-type: "ai"
-category: "Embeddings"
-tags: ["Embeddings", "LLM", "Vector Databases", "Performance"]
-difficulty: "beginner"
+title: 'What are Embeddings?'
+description: 'How text becomes a vector, why cosine similarity works as a proxy for meaning, and what actually determines embedding quality.'
+type: 'ai'
+category: 'Embeddings'
+tags: ['Embeddings', 'LLM', 'Vector Databases', 'Performance']
+difficulty: 'beginner'
 readingTime: 9
-publishedAt: "2026-05-18"
-updatedAt: "2026-06-01"
+publishedAt: '2026-05-18'
+updatedAt: '2026-06-01'
 featured: true
-related: ["ai/rag", "ai/vector-databases", "concepts/database-index"]
+related: ['ai/rag', 'ai/vector-databases', 'concepts/database-index']
 ---
 
 An embedding is a list of floating-point numbers that represents a piece of text such that texts with similar meaning end up as nearby points in that number space. Everything RAG, semantic search, and recommendation systems do with "meaning" is really just arithmetic on these vectors.
@@ -35,7 +35,10 @@ def embed(text: str) -> list[float]:
 ```
 
 <Callout type="warning">
-That snippet is deliberately illustrative, not a real embeddings call — chat completion models are not embedding models. Use a model built and trained specifically to output embeddings; mixing the two produces vectors with none of the geometric properties similarity search depends on.
+  That snippet is deliberately illustrative, not a real embeddings call — chat completion models
+  are not embedding models. Use a model built and trained specifically to output embeddings;
+  mixing the two produces vectors with none of the geometric properties similarity search
+  depends on.
 </Callout>
 
 Real embedding models are trained with a contrastive objective: pull matching pairs (a question and its answer, two paraphrases) together in vector space, push unrelated pairs apart. That objective, not the model's parameter count, is what determines whether the resulting geometry is actually useful for search.
@@ -44,16 +47,18 @@ Real embedding models are trained with a contrastive objective: pull matching pa
 
 Once you have vectors, "similar" needs a precise definition. The two you'll encounter constantly:
 
-| Metric | Formula intuition | When to use |
-|---|---|---|
-| Cosine similarity | Angle between two vectors, ignores magnitude | Default for most text embeddings; magnitude often just reflects text length |
-| Dot product | Cosine similarity times both magnitudes | Faster to compute; equivalent to cosine if vectors are pre-normalized to unit length |
-| Euclidean distance | Straight-line distance between points | Common in clustering; less standard for text similarity |
+| Metric             | Formula intuition                            | When to use                                                                          |
+| ------------------ | -------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Cosine similarity  | Angle between two vectors, ignores magnitude | Default for most text embeddings; magnitude often just reflects text length          |
+| Dot product        | Cosine similarity times both magnitudes      | Faster to compute; equivalent to cosine if vectors are pre-normalized to unit length |
+| Euclidean distance | Straight-line distance between points        | Common in clustering; less standard for text similarity                              |
 
 Most embedding models are trained and benchmarked against cosine similarity specifically, so unless you have a concrete reason to deviate, normalize your vectors and use cosine (or the equivalent normalized dot product, which is cheaper on most hardware).
 
 <Callout type="insight" title="Normalization matters more than the metric">
-A common bug: mixing normalized query vectors with un-normalized document vectors, or vice versa. The similarity scores still come back as numbers that look plausible, they're just wrong — and nothing in the pipeline raises an error to tell you.
+  A common bug: mixing normalized query vectors with un-normalized document vectors, or vice
+  versa. The similarity scores still come back as numbers that look plausible, they're just
+  wrong — and nothing in the pipeline raises an error to tell you.
 </Callout>
 
 ## Dimensionality and Cost
@@ -67,7 +72,9 @@ Some newer embedding models support Matryoshka representation learning, where yo
 The wrong axis to optimize first is raw benchmark score. The right axis is: does this model perform well on text that looks like yours? A model tuned on web prose can underperform a smaller, domain-tuned model on legal contracts or source code. Before committing to a model for a RAG pipeline, run a retrieval eval — a set of real queries with known correct chunks — against a couple of candidate models rather than trusting a leaderboard number.
 
 <Callout type="tip">
-Whatever embedding model you pick, embed queries and documents with the exact same model and the exact same preprocessing (lowercasing, whitespace handling, truncation length). Embeddings from two different model versions are not comparable, even if the model name looks the same.
+  Whatever embedding model you pick, embed queries and documents with the exact same model and
+  the exact same preprocessing (lowercasing, whitespace handling, truncation length). Embeddings
+  from two different model versions are not comparable, even if the model name looks the same.
 </Callout>
 
 Multilingual coverage is a separate axis from general quality, and it's easy to assume a model handles it well without checking. A model that scores well on English retrieval benchmarks can perform noticeably worse when the query and the matching document are in different languages, or when the corpus mixes languages within the same index. If your traffic is multilingual, evaluate cross-lingual retrieval specifically — same-language performance numbers don't predict it.

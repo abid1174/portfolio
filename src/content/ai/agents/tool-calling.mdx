@@ -1,15 +1,15 @@
 ---
-title: "Tool Calling"
+title: 'Tool Calling'
 description: "How structured tool use actually works under the hood, why it isn't function execution, and what makes a tool definition easy for a model to call correctly."
-type: "ai"
-category: "Agents"
-tags: ["Tool Calling", "Agents", "API Design", "Reliability"]
-difficulty: "intermediate"
+type: 'ai'
+category: 'Agents'
+tags: ['Tool Calling', 'Agents', 'API Design', 'Reliability']
+difficulty: 'intermediate'
 readingTime: 10
-publishedAt: "2026-07-27"
-updatedAt: "2026-08-07"
+publishedAt: '2026-07-27'
+updatedAt: '2026-08-07'
 featured: false
-related: ["ai/ai-agents", "ai/llm-evaluation", "concepts/idempotency"]
+related: ['ai/ai-agents', 'ai/llm-evaluation', 'concepts/idempotency']
 ---
 
 Tool calling is the mechanism that lets a model do more than generate text: instead of answering directly, it can emit a structured request to run a function, get the result back, and continue reasoning with that result in hand. The model never executes anything itself — it only ever produces a description of a call. Your code is what actually runs it.
@@ -19,7 +19,10 @@ Tool calling is the mechanism that lets a model do more than generate text: inst
 A tool definition is a name, a description, and a JSON schema for its inputs, sent alongside a request. When the model decides a tool would help answer the request, instead of (or in addition to) generating text, it emits a `tool_use` content block: a tool name and a JSON object matching that schema. The response stops there — the model is waiting for you to actually run the tool and hand back a result before it continues.
 
 <Callout type="note">
-"The model called the tool" is a common but slightly misleading phrase. The model produced structured intent to call a tool. Nothing executes until your code reads that block and runs the corresponding function — which means tool calling is exactly as safe or unsafe as the code you write to handle it, not the model's judgment alone.
+  "The model called the tool" is a common but slightly misleading phrase. The model produced
+  structured intent to call a tool. Nothing executes until your code reads that block and runs
+  the corresponding function — which means tool calling is exactly as safe or unsafe as the code
+  you write to handle it, not the model's judgment alone.
 </Callout>
 
 ## Defining a Tool
@@ -78,31 +81,33 @@ Beyond the JSON schema itself, tool descriptions benefit from stating not just w
 A single model response can contain multiple `tool_use` blocks at once, when the calls don't depend on each other's results. Execute them concurrently and return every corresponding `tool_result` in one message, not split across several — returning them one at a time trains the model, over the course of a conversation, to stop batching independent calls together, which costs you latency on every subsequent multi-tool turn.
 
 ```ts
-const toolUses = response.content.filter((b) => b.type === "tool_use");
+const toolUses = response.content.filter((b) => b.type === 'tool_use');
 
 const results = await Promise.all(
   toolUses.map(async (block) => ({
-    type: "tool_result" as const,
+    type: 'tool_result' as const,
     tool_use_id: block.id,
     content: await executeTool(block.name, block.input),
-  }))
+  })),
 );
 
-messages.push({ role: "user", content: results });
+messages.push({ role: 'user', content: results });
 ```
 
 ## Designing Tools the Model Can Use Reliably
 
-| Design choice | Why it matters |
-|---|---|
-| Narrow, single-purpose tools | Easier for the model to pick correctly among several options |
-| Descriptive names over generic ones | `get_order_status` beats `query`, especially with many tools defined |
-| Return structured errors, not silent failure | Model can reason about and recover from a clear error |
-| Idempotent where possible | A retried call after a timeout doesn't double-execute a side effect |
-| Keep required parameters minimal | Fewer chances for the model to omit something needed |
+| Design choice                                | Why it matters                                                       |
+| -------------------------------------------- | -------------------------------------------------------------------- |
+| Narrow, single-purpose tools                 | Easier for the model to pick correctly among several options         |
+| Descriptive names over generic ones          | `get_order_status` beats `query`, especially with many tools defined |
+| Return structured errors, not silent failure | Model can reason about and recover from a clear error                |
+| Idempotent where possible                    | A retried call after a timeout doesn't double-execute a side effect  |
+| Keep required parameters minimal             | Fewer chances for the model to omit something needed                 |
 
 <Callout type="tip">
-When an application has many tools, group related ones and consider only exposing a subset relevant to the current task. A model choosing between three well-differentiated tools is far more reliable than one choosing between thirty similarly named ones.
+  When an application has many tools, group related ones and consider only exposing a subset
+  relevant to the current task. A model choosing between three well-differentiated tools is far
+  more reliable than one choosing between thirty similarly named ones.
 </Callout>
 
 ## Error Handling
@@ -112,7 +117,10 @@ A failed tool call should come back as a `tool_result` with an error flag, not b
 Distinguish, in the error content you return, between a validation failure the model caused (a malformed order ID it can fix by trying again) and an infrastructure failure it can't do anything about (the downstream service is down). Collapsing both into a generic "tool failed" message pushes the model toward retrying a call that will keep failing for reasons entirely outside its control, burning turns and tokens on retries that were never going to succeed.
 
 <Callout type="warning">
-Idempotency matters more in tool-calling systems than it does in most user-facing APIs, because retries here are driven by a model's judgment, not a fixed retry policy you control. A network blip during a `charge_customer` call, followed by the model deciding to retry, should not double-charge — build idempotency keys into side-effecting tools from the start.
+  Idempotency matters more in tool-calling systems than it does in most user-facing APIs,
+  because retries here are driven by a model's judgment, not a fixed retry policy you control. A
+  network blip during a `charge_customer` call, followed by the model deciding to retry, should
+  not double-charge — build idempotency keys into side-effecting tools from the start.
 </Callout>
 
 ## Takeaway

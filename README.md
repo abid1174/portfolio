@@ -17,12 +17,12 @@ Git → MDX → Astro Content Collections → ContentRepository → Astro pages
                                                               └── React islands
 ```
 
-| Layer | Built with |
-| --- | --- |
-| Pages, layouts, cards, navigation, article shell, TOC, SEO | Astro |
-| Search palette, theme switcher, filters, bookmarks, Mermaid, copy buttons | React islands |
-| Content | MDX in `src/content`, validated with Zod |
-| Styling | Tailwind v4 over CSS custom properties (`src/styles/tokens.css`) |
+| Layer                                                                     | Built with                                                       |
+| ------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Pages, layouts, cards, navigation, article shell, TOC, SEO                | Astro                                                            |
+| Search palette, theme switcher, filters, bookmarks, Mermaid, copy buttons | React islands                                                    |
+| Content                                                                   | MDX in `src/content`, validated with Zod                         |
+| Styling                                                                   | Tailwind v4 over CSS custom properties (`src/styles/tokens.css`) |
 
 `src/lib/content.ts` exposes a `ContentRepository` — the only module that touches
 `astro:content`. Swapping the backing store for a CMS or Postgres later means
@@ -32,11 +32,11 @@ reimplementing that file, not the UI.
 
 Three collections, one shared base schema (`src/content.config.ts`):
 
-| Collection | Route | Layout |
-| --- | --- | --- |
-| `concepts` | `/concepts/<slug>` | `ConceptLayout` |
+| Collection      | Route                   | Layout               |
+| --------------- | ----------------------- | -------------------- |
+| `concepts`      | `/concepts/<slug>`      | `ConceptLayout`      |
 | `system-design` | `/system-design/<slug>` | `SystemDesignLayout` |
-| `ai` | `/ai/<slug>` | `AILearningLayout` |
+| `ai`            | `/ai/<slug>`            | `AILearningLayout`   |
 
 The URL slug is the **filename**; category folders are for authoring only, so an article can
 be re-filed without breaking its permalink.
@@ -45,11 +45,11 @@ be re-filed without breaking its permalink.
 ---
 title: 'What is PKCE?'
 description: 'A practical explanation of Proof Key for Code Exchange.'
-type: 'concept'          # concept | system-design | ai
+type: 'concept' # concept | system-design | ai
 category: 'Authentication'
 tags: ['OAuth', 'Security', 'Authentication']
-difficulty: 'beginner'   # beginner | intermediate | advanced
-readingTime: 8           # optional — computed from the body when omitted
+difficulty: 'beginner' # beginner | intermediate | advanced
+readingTime: 8 # optional — computed from the body when omitted
 publishedAt: '2026-04-03'
 updatedAt: '2026-08-19'
 featured: true
@@ -69,15 +69,15 @@ Auto-injected — no imports needed in content files:
 
 ## Commands
 
-| Command | Does |
-| --- | --- |
-| `npm run dev` | Dev server |
-| `npm run build` | Static build to `dist/` |
-| `npm run preview` | Serve the build |
-| `npm run check` | `astro check` — types across `.astro`, `.ts`, `.tsx` |
-| `npm run lint` | ESLint |
-| `npm run format` | Prettier |
-| `npm run og` | Regenerate `public/og/*.png` social images |
+| Command           | Does                                                 |
+| ----------------- | ---------------------------------------------------- |
+| `npm run dev`     | Dev server                                           |
+| `npm run build`   | Static build to `dist/`                              |
+| `npm run preview` | Serve the build                                      |
+| `npm run check`   | `astro check` — types across `.astro`, `.ts`, `.tsx` |
+| `npm run lint`    | ESLint                                               |
+| `npm run format`  | Prettier                                             |
+| `npm run og`      | Regenerate `public/og/*.png` social images           |
 
 ## Notes
 

@@ -1,6 +1,5 @@
 ---
 import { ArrowUpRight } from 'lucide-react';
-import DifficultyBadge from './DifficultyBadge.astro';
 import type { ContentEntry } from '../../lib/content';
 import { formatDate, isoDate } from '../../lib/utils';
 
@@ -29,9 +28,7 @@ const { entry, index, showDate = false } = Astro.props;
       <span class="list-meta">
         <span class="list-category">{entry.category}</span>
         <span class="list-sep" aria-hidden="true">·</span>
-        <span class="list-time">{entry.readingTime} min</span>
-        <span class="list-sep" aria-hidden="true">·</span>
-        <DifficultyBadge difficulty={entry.difficulty} />
+        <span class="list-level">{entry.difficulty}</span>
         {
           showDate && (
             <>
@@ -109,6 +106,11 @@ const { entry, index, showDate = false } = Astro.props;
 
   .list-sep {
     opacity: 0.5;
+  }
+
+  .list-level {
+    text-transform: capitalize;
+    letter-spacing: 0.06em;
   }
 
   :global(.list-arrow) {

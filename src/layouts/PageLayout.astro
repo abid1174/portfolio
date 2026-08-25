@@ -68,7 +68,7 @@ const { width = 'default', ...rest } = Astro.props;
     display: none;
     position: fixed;
     inset: 0;
-    z-index: 50;
+    z-index: var(--z-scrim);
     background: color-mix(in oklab, var(--bg-primary) 70%, transparent);
     backdrop-filter: blur(2px);
   }

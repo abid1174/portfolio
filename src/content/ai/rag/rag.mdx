@@ -1,15 +1,16 @@
 ---
-title: "What is RAG?"
-description: "How retrieval augmented generation grounds LLM outputs in your own data, and where the pattern breaks down in production."
-type: "ai"
-category: "RAG"
-tags: ["LLM", "RAG", "Embeddings", "Vector Databases"]
-difficulty: "beginner"
+title: 'What is RAG?'
+description: 'How retrieval augmented generation grounds LLM outputs in your own data, and where the pattern breaks down in production.'
+type: 'ai'
+category: 'RAG'
+tags: ['LLM', 'RAG', 'Embeddings', 'Vector Databases']
+difficulty: 'beginner'
 readingTime: 10
-publishedAt: "2026-05-05"
-updatedAt: "2026-05-19"
+publishedAt: '2026-05-05'
+updatedAt: '2026-05-19'
 featured: true
-related: ["ai/embeddings", "ai/vector-databases", "ai/rag-vs-fine-tuning", "concepts/database-index"]
+related:
+  ['ai/embeddings', 'ai/vector-databases', 'ai/rag-vs-fine-tuning', 'concepts/database-index']
 ---
 
 A model only knows what was in its training data, frozen at some cutoff, plus whatever you put in the prompt. Retrieval augmented generation (RAG) is the pattern for filling that gap: before you ask the model anything, you search your own data for the passages most relevant to the question and paste them into the context window.
@@ -21,7 +22,9 @@ Frontier models are trained on a snapshot. They don't know your internal wiki, y
 The other problem RAG addresses is grounding. Ask a model a specific factual question with no supporting context and it will sometimes answer fluently and wrongly — a hallucination that reads exactly like a correct answer. Give the model the actual source text and instruct it to answer only from that text, and you get a system whose failure mode shifts from "confidently wrong" to "correctly says it doesn't know," which is a much easier failure to catch downstream.
 
 <Callout type="note">
-RAG is not a database feature and not a single library — it's an architecture pattern built from three pieces you already understand: search, prompt construction, and generation. Most of the engineering effort goes into the search step, not the LLM call.
+  RAG is not a database feature and not a single library — it's an architecture pattern built
+  from three pieces you already understand: search, prompt construction, and generation. Most of
+  the engineering effort goes into the search step, not the LLM call.
 </Callout>
 
 ## How Retrieval Fits Into a Request
@@ -44,14 +47,16 @@ You can't embed an entire 40-page PDF as one vector and expect useful retrieval 
 
 Chunk size is a real tradeoff, not a knob you set once and forget:
 
-| Chunk size | Retrieval precision | Context per chunk | Risk |
-|---|---|---|---|
-| Small (~100-200 tokens) | High — narrow, specific matches | Low — may lack surrounding context | Answers cite fragments missing needed context |
-| Medium (~400-600 tokens) | Balanced | Moderate | Reasonable default for prose-heavy docs |
-| Large (~1000+ tokens) | Low — embedding blurs across topics | High | Irrelevant chunks rank highly, wasting context budget |
+| Chunk size               | Retrieval precision                 | Context per chunk                  | Risk                                                  |
+| ------------------------ | ----------------------------------- | ---------------------------------- | ----------------------------------------------------- |
+| Small (~100-200 tokens)  | High — narrow, specific matches     | Low — may lack surrounding context | Answers cite fragments missing needed context         |
+| Medium (~400-600 tokens) | Balanced                            | Moderate                           | Reasonable default for prose-heavy docs               |
+| Large (~1000+ tokens)    | Low — embedding blurs across topics | High                               | Irrelevant chunks rank highly, wasting context budget |
 
 <Callout type="tip" title="Chunk on structure first">
-Splitting on a fixed token count alone tends to cut sentences and tables in half. Split on document structure — headings, paragraphs, list boundaries — and only fall back to a token cap when a structural unit is too large on its own.
+  Splitting on a fixed token count alone tends to cut sentences and tables in half. Split on
+  document structure — headings, paragraphs, list boundaries — and only fall back to a token cap
+  when a structural unit is too large on its own.
 </Callout>
 
 ## Retrieval Quality vs Generation Quality
@@ -92,7 +97,9 @@ Question: How often does my rate limit reset?`}
 RAG fails in a handful of predictable ways. Retrieval returns near-duplicate chunks that crowd out a diverse set of relevant passages. Queries phrased differently from the source text score poorly under pure embedding similarity — "how do I cancel" and "subscription termination process" are semantically close but not always close enough to rank the right chunk first. And multi-hop questions, where the answer requires combining facts from two different documents, defeat single-pass retrieval entirely because no single chunk contains the full answer.
 
 <Callout type="warning">
-Adding more chunks to the prompt is not a free fix for weak retrieval. Every irrelevant chunk you stuff into context costs tokens, adds latency, and gives the model more chances to anchor on the wrong passage. Tune the retriever before you widen `k`.
+  Adding more chunks to the prompt is not a free fix for weak retrieval. Every irrelevant chunk
+  you stuff into context costs tokens, adds latency, and gives the model more chances to anchor
+  on the wrong passage. Tune the retriever before you widen `k`.
 </Callout>
 
 Reranking helps: retrieve a wider candidate set with a fast approximate method, then run a smaller cross-encoder model over just those candidates to reorder them by actual relevance to the query. It's slower than pure vector search but far cheaper than running every document through a cross-encoder, and it typically fixes a meaningful share of near-miss retrieval failures.

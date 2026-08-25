@@ -14,36 +14,36 @@ const { stats } = Astro.props;
 // Every figure is derived from the content collections — adding an
 // article updates the hero with no code change.
 const figures = [
-  { value: String(stats.concepts), label: 'Concepts', accent: 'var(--accent-blue)' },
+  { value: String(stats.concepts), label: 'Concepts', accent: 'var(--accent-emerald)' },
   {
     value: String(stats.systemDesigns),
     label: 'System Designs',
-    accent: 'var(--accent-purple)',
+    accent: 'var(--accent-lime)',
   },
   {
     value: String(stats.practices),
     label: 'Engineering Practices',
     accent: 'var(--border-strong)',
   },
-  { value: String(stats.ai), label: 'AI Notes', accent: 'var(--accent-cyan)' },
+  { value: String(stats.ai), label: 'AI Notes', accent: 'var(--accent-teal)' },
 ];
 ---
 
 <section class="hero" aria-labelledby="hero-title">
-  <div class="hero-glow" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"></div>
   <div class="hero-grid grid-backdrop" aria-hidden="true"></div>
 
   <div class="hero-inner">
     <div class="hero-copy">
-      <p class="label-mono hero-eyebrow">
+      <p class="hero-eyebrow">
         <span class="dot" aria-hidden="true"></span>
         Engineering notes · {site.role}
       </p>
 
       <h1 id="hero-title">
-        <span class="line line-1">Clear concepts.</span>
-        <span class="line line-2">Scalable systems.</span>
-        <span class="line line-3">Smarter with AI.</span>
+        <span class="line">Clear concepts.</span>
+        <span class="line">Scalable systems.</span>
+        <span class="line line-accent">Smarter with AI.</span>
       </h1>
 
       <p class="hero-lede">
@@ -56,7 +56,7 @@ const figures = [
           Browse concepts
           <ArrowRight size={15} strokeWidth={2} aria-hidden="true" />
         </a>
-        <a class="btn btn-ghost" href="/system-design">Read a system design</a>
+        <a class="btn btn-outline" href="/system-design">Read a system design</a>
         <p class="hero-hint">
           <span>or press</span>
           <kbd><Command size={10} strokeWidth={2.5} aria-hidden="true" />K</kbd>
@@ -81,53 +81,77 @@ const figures = [
     overflow: hidden;
     border: 1px solid var(--border-subtle);
     border-radius: var(--radius-xl);
-    background: linear-gradient(160deg, var(--surface) 0%, var(--bg-secondary) 55%);
-    padding: clamp(1.5rem, 4vw, 2.75rem);
+    background: var(--bg-secondary);
+    padding: clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 4vw, 3rem) clamp(1.5rem, 4vw, 2.5rem);
   }
 
-  .hero-glow {
+  /* Mesh of soft green light rather than a flat linear gradient —
+     three offset radials that drift slowly against each other. */
+  .aurora {
     position: absolute;
-    top: -45%;
-    left: 8%;
-    width: 70%;
-    height: 120%;
+    inset: -30% -10%;
+    pointer-events: none;
     background:
       radial-gradient(
-        40% 45% at 25% 40%,
-        color-mix(in oklab, var(--accent-blue) 26%, transparent),
+        32% 40% at 18% 34%,
+        color-mix(in oklab, var(--accent-emerald) 30%, transparent),
+        transparent 68%
+      ),
+      radial-gradient(
+        28% 34% at 72% 18%,
+        color-mix(in oklab, var(--accent-teal) 24%, transparent),
         transparent 70%
       ),
       radial-gradient(
-        35% 40% at 62% 30%,
-        color-mix(in oklab, var(--accent-purple) 20%, transparent),
-        transparent 70%
+        26% 30% at 52% 74%,
+        color-mix(in oklab, var(--accent-lime) 18%, transparent),
+        transparent 72%
       );
-    filter: blur(60px);
-    pointer-events: none;
+    filter: blur(64px);
+    opacity: 0.9;
+    animation: drift 28s var(--ease-out) infinite alternate;
+  }
+
+  @keyframes drift {
+    from {
+      transform: translate3d(-2%, -1%, 0) scale(1);
+    }
+    to {
+      transform: translate3d(3%, 2%, 0) scale(1.08);
+    }
   }
 
   .hero-grid {
     position: absolute;
     inset: 0;
-    opacity: 0.35;
+    opacity: 0.4;
     /* Fades out toward the copy so text never fights the grid. */
     mask-image: radial-gradient(80% 60% at 78% 30%, #000 0%, transparent 75%);
     pointer-events: none;
   }
 
+  /* Deliberately off-balance: the copy gets the wide column and the
+     schematic sits high and right rather than centred against it. */
   .hero-inner {
     position: relative;
     display: grid;
-    grid-template-columns: minmax(0, 1fr) minmax(0, 22rem);
-    align-items: center;
-    gap: clamp(1.5rem, 4vw, 3rem);
+    grid-template-columns: minmax(0, 1fr) minmax(0, 21rem);
+    align-items: start;
+    gap: clamp(1.5rem, 4vw, 3.5rem);
+  }
+
+  .hero-copy {
+    padding-top: clamp(0.5rem, 2vw, 1.75rem);
   }
 
   .hero-eyebrow {
     display: flex;
     align-items: center;
-    gap: 0.5rem;
-    margin: 0 0 1.1rem;
+    gap: 0.55rem;
+    margin: 0 0 1.25rem;
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    letter-spacing: 0.02em;
     color: var(--text-secondary);
   }
 
@@ -135,35 +159,42 @@ const figures = [
     width: 6px;
     height: 6px;
     border-radius: 50%;
-    background: var(--accent-cyan);
-    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-cyan) 20%, transparent);
+    background: var(--accent-emerald);
+    box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-emerald) 18%, transparent);
+    animation: pulse 3.2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%,
+    100% {
+      box-shadow: 0 0 0 3px color-mix(in oklab, var(--accent-emerald) 18%, transparent);
+    }
+    50% {
+      box-shadow: 0 0 0 6px color-mix(in oklab, var(--accent-emerald) 6%, transparent);
+    }
   }
 
   h1 {
     margin: 0;
-    font-size: clamp(2.125rem, 5.4vw, 3.75rem);
+    font-size: var(--text-display);
     font-weight: 700;
-    letter-spacing: -0.04em;
-    line-height: 1.04;
+    letter-spacing: var(--tracking-display);
+    line-height: var(--leading-display);
   }
 
   .line {
     display: block;
-  }
-  .line-1 {
     color: var(--text-primary);
   }
-  .line-2 {
-    color: var(--text-primary);
-  }
+
   /* Only the third line takes the gradient — restraint keeps it
      reading as a publication, not a landing page. */
-  .line-3 {
+  .line-accent {
     background: linear-gradient(
       100deg,
-      var(--accent-blue) 0%,
-      var(--accent-purple) 45%,
-      var(--accent-cyan) 100%
+      var(--accent-emerald) 0%,
+      var(--accent-teal) 48%,
+      var(--accent-lime) 100%
     );
     -webkit-background-clip: text;
     background-clip: text;
@@ -171,10 +202,10 @@ const figures = [
   }
 
   .hero-lede {
-    margin: 1.25rem 0 0;
+    margin: 1.5rem 0 0;
     max-width: 46ch;
-    font-size: clamp(0.9375rem, 1.4vw, 1.0625rem);
-    line-height: 1.65;
+    font-size: clamp(0.9375rem, 1.4vw, var(--text-body));
+    line-height: var(--leading-body);
     color: var(--text-secondary);
   }
 
@@ -182,48 +213,8 @@ const figures = [
     display: flex;
     align-items: center;
     flex-wrap: wrap;
-    gap: 0.65rem 0.9rem;
-    margin-top: 1.75rem;
-  }
-
-  .btn {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.55rem 1rem;
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    font-weight: 500;
-    text-decoration: none;
-    border: 1px solid transparent;
-    transition:
-      background-color var(--dur-fast) var(--ease-out),
-      border-color var(--dur-fast) var(--ease-out),
-      color var(--dur-fast) var(--ease-out);
-  }
-
-  .btn-primary {
-    background: var(--accent-blue);
-    color: #fff;
-  }
-  .btn-primary:hover {
-    background: var(--accent-blue-dim);
-  }
-  .btn-primary :global(svg) {
-    transition: transform var(--dur-base) var(--ease-out);
-  }
-  .btn-primary:hover :global(svg) {
-    transform: translateX(3px);
-  }
-
-  .btn-ghost {
-    border-color: var(--border-default);
-    color: var(--text-secondary);
-    background: var(--surface);
-  }
-  .btn-ghost:hover {
-    color: var(--text-primary);
-    border-color: var(--border-strong);
+    gap: 0.65rem 1rem;
+    margin-top: 2rem;
   }
 
   .hero-hint {
@@ -231,7 +222,7 @@ const figures = [
     align-items: center;
     gap: 0.35rem;
     margin: 0;
-    font-size: 0.75rem;
+    font-size: var(--text-xs);
     color: var(--text-muted);
   }
 
@@ -239,18 +230,60 @@ const figures = [
     display: inline-flex;
     align-items: center;
     gap: 0.1rem;
-    padding: 0.1rem 0.3rem;
+    padding: 0.1rem 0.32rem;
     border: 1px solid var(--border-default);
-    border-radius: 4px;
+    border-radius: var(--radius-sm);
     background: var(--surface-inset);
     font-family: var(--font-mono);
-    font-size: 0.6875rem;
+    font-size: var(--text-2xs);
     color: var(--text-secondary);
   }
 
   .hero-stats {
     position: relative;
-    margin-top: clamp(1.75rem, 4vw, 2.5rem);
+    margin-top: clamp(2rem, 5vw, 3rem);
+  }
+
+  /* Staggered entry: nothing mounts all at once. */
+  .hero-eyebrow,
+  .line,
+  .hero-lede,
+  .hero-actions,
+  .hero-visual,
+  .hero-stats {
+    animation: rise var(--dur-slow) var(--ease-out) both;
+  }
+  .line:nth-child(1) {
+    animation-delay: 60ms;
+  }
+  .line:nth-child(2) {
+    animation-delay: 120ms;
+  }
+  .line:nth-child(3) {
+    animation-delay: 180ms;
+  }
+  .hero-lede {
+    animation-delay: 240ms;
+  }
+  .hero-actions {
+    animation-delay: 300ms;
+  }
+  .hero-visual {
+    animation-delay: 200ms;
+  }
+  .hero-stats {
+    animation-delay: 360ms;
+  }
+
+  @keyframes rise {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: none;
+    }
   }
 
   @media (max-width: 62rem) {
@@ -273,6 +306,21 @@ const figures = [
     }
     .hero-hint {
       display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .aurora,
+    .dot {
+      animation: none;
+    }
+    .hero-eyebrow,
+    .line,
+    .hero-lede,
+    .hero-actions,
+    .hero-visual,
+    .hero-stats {
+      animation: none;
     }
   }
 </style>

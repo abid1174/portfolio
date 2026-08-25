@@ -3,3 +3,4 @@ node_modules
 .astro
 public/og
 package-lock.json
+.agents

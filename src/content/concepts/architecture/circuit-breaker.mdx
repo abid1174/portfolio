@@ -1,15 +1,15 @@
 ---
-title: "What is a Circuit Breaker?"
+title: 'What is a Circuit Breaker?'
 description: "A circuit breaker stops a service from repeatedly calling a dependency that's already failing, giving it room to recover instead of being buried under retries."
-type: "concept"
-category: "Architecture"
-tags: ["Architecture", "Reliability", "Backend", "Distributed Systems"]
-difficulty: "beginner"
+type: 'concept'
+category: 'Architecture'
+tags: ['Architecture', 'Reliability', 'Backend', 'Distributed Systems']
+difficulty: 'beginner'
 readingTime: 7
-publishedAt: "2026-08-12"
-updatedAt: "2026-08-22"
+publishedAt: '2026-08-12'
+updatedAt: '2026-08-22'
 featured: false
-related: ["concepts/idempotency", "concepts/outbox-pattern", "system-design/rate-limiter"]
+related: ['concepts/idempotency', 'concepts/outbox-pattern', 'system-design/rate-limiter']
 ---
 
 Named after the electrical device that trips to stop a current before it burns down the wiring, a software circuit breaker trips to stop calls to a dependency that's already failing, before those calls burn down the rest of your system too.
@@ -19,18 +19,20 @@ Named after the electrical device that trips to stop a current before it burns d
 Without a circuit breaker, a struggling downstream service tends to make things worse for everyone calling it. Requests pile up waiting on a slow or failing dependency, threads or connections get held open, retries add even more load on top of a service that's already struggling, and the calling service itself starts timing out — which then cascades to whatever's calling it. A single failing dependency, left unmanaged, can take down services three hops away that never directly touch it.
 
 <Callout type="warning">
-Retrying a failing call feels like resilience, but blind retries during an outage are the single most common way to turn a degraded dependency into a fully dead one — you're adding load precisely when it has the least capacity to handle it.
+  Retrying a failing call feels like resilience, but blind retries during an outage are the
+  single most common way to turn a degraded dependency into a fully dead one — you're adding
+  load precisely when it has the least capacity to handle it.
 </Callout>
 
 ## Three States
 
 A circuit breaker wraps calls to a dependency and tracks recent failures, moving between three states based on what it sees.
 
-| State | Behavior | Transitions to |
-|---|---|---|
-| Closed | Calls pass through normally, failures are counted | Open, once the failure threshold is crossed |
-| Open | Calls fail immediately without touching the dependency | Half-open, after a cooldown period |
-| Half-open | A limited number of test calls are allowed through | Closed if they succeed, back to Open if they fail |
+| State     | Behavior                                               | Transitions to                                    |
+| --------- | ------------------------------------------------------ | ------------------------------------------------- |
+| Closed    | Calls pass through normally, failures are counted      | Open, once the failure threshold is crossed       |
+| Open      | Calls fail immediately without touching the dependency | Half-open, after a cooldown period                |
+| Half-open | A limited number of test calls are allowed through     | Closed if they succeed, back to Open if they fail |
 
 <Mermaid caption="Circuit breaker state transitions">{`flowchart LR
     Closed -->|failure threshold exceeded| Open
@@ -43,24 +45,24 @@ The open state is the important one: instead of letting every caller individuall
 ## A Basic Implementation
 
 ```ts
-type State = "closed" | "open" | "half-open";
+type State = 'closed' | 'open' | 'half-open';
 
 class CircuitBreaker {
-  private state: State = "closed";
+  private state: State = 'closed';
   private failureCount = 0;
   private lastFailureAt = 0;
 
   constructor(
     private readonly failureThreshold = 5,
-    private readonly cooldownMs = 30_000
+    private readonly cooldownMs = 30_000,
   ) {}
 
   async call<T>(fn: () => Promise<T>): Promise<T> {
-    if (this.state === "open") {
+    if (this.state === 'open') {
       if (Date.now() - this.lastFailureAt < this.cooldownMs) {
-        throw new Error("Circuit is open, failing fast");
+        throw new Error('Circuit is open, failing fast');
       }
-      this.state = "half-open";
+      this.state = 'half-open';
     }
 
     try {
@@ -75,14 +77,14 @@ class CircuitBreaker {
 
   private onSuccess() {
     this.failureCount = 0;
-    this.state = "closed";
+    this.state = 'closed';
   }
 
   private onFailure() {
     this.failureCount++;
     this.lastFailureAt = Date.now();
-    if (this.failureCount >= this.failureThreshold || this.state === "half-open") {
-      this.state = "open";
+    if (this.failureCount >= this.failureThreshold || this.state === 'half-open') {
+      this.state = 'open';
     }
   }
 }
@@ -103,25 +105,33 @@ Real implementations usually track a rolling window of recent call outcomes (a f
 Getting the thresholds right matters more than getting the pattern right. Too sensitive, and normal transient blips trip the breaker constantly, adding latency and failed requests that a couple of retries would have absorbed just fine. Too lax, and the breaker doesn't trip until the dependency and everything calling it are already in serious trouble.
 
 <Callout type="tip">
-Start from the dependency's own error budget and typical latency, not a round number picked out of habit. A payment provider with a documented 99.9% SLA should trip on a failure rate meaningfully above 0.1%, sampled over a window long enough to not be dominated by single-digit request counts.
+  Start from the dependency's own error budget and typical latency, not a round number picked
+  out of habit. A payment provider with a documented 99.9% SLA should trip on a failure rate
+  meaningfully above 0.1%, sampled over a window long enough to not be dominated by single-digit
+  request counts.
 </Callout>
 
 ## Circuit Breaker, Retry, and Timeout Are Different Tools
 
 These three get bundled together constantly, but they solve different problems and are meant to be used together, not as substitutes for each other.
 
-| Pattern | Question it answers | Protects |
-|---|---|---|
-| Timeout | How long will I wait for one call? | The calling thread/request from hanging forever |
-| Retry | Should I try this specific call again? | Recovery from a single transient blip |
-| Circuit breaker | Should I even attempt calls to this dependency right now? | Both sides from sustained, ongoing failure |
+| Pattern         | Question it answers                                       | Protects                                        |
+| --------------- | --------------------------------------------------------- | ----------------------------------------------- |
+| Timeout         | How long will I wait for one call?                        | The calling thread/request from hanging forever |
+| Retry           | Should I try this specific call again?                    | Recovery from a single transient blip           |
+| Circuit breaker | Should I even attempt calls to this dependency right now? | Both sides from sustained, ongoing failure      |
 
 A sensible stack applies all three: a timeout bounds each individual call, a small number of retries with backoff handle transient blips, and the circuit breaker sits above both, tracking the aggregate failure rate and cutting off the retries-plus-timeouts machinery entirely once the dependency is clearly down rather than just having a bad moment.
 
 ## Circuit Breakers Interact With Idempotency
 
 <Callout type="insight">
-A tripped-then-recovered breaker means some calls definitely failed and some may have partially succeeded before the trip. Anything a circuit breaker wraps that isn't safely retriable — a payment call without an idempotency key, for instance — can leave you with duplicated side effects once the breaker closes again and retries resume. Circuit breakers assume the calls behind them are safe to retry; make sure that's actually true before relying on one.
+  A tripped-then-recovered breaker means some calls definitely failed and some may have
+  partially succeeded before the trip. Anything a circuit breaker wraps that isn't safely
+  retriable — a payment call without an idempotency key, for instance — can leave you with
+  duplicated side effects once the breaker closes again and retries resume. Circuit breakers
+  assume the calls behind them are safe to retry; make sure that's actually true before relying
+  on one.
 </Callout>
 
 ## Takeaway
