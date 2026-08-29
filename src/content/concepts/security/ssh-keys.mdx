@@ -1,0 +1,226 @@
+---
+title: 'What is an SSH Key?'
+description: 'An SSH key is a public/private keypair that proves who you are to a server without ever sending a secret over the wire — replacing passwords with a challenge you can only answer if you hold the private half.'
+type: 'concept'
+category: 'Security'
+tags: ['SSH', 'Security', 'Authentication', 'Cryptography', 'DevOps']
+difficulty: 'beginner'
+readingTime: 8
+publishedAt: '2026-08-29'
+featured: false
+related: ['concepts/jwt', 'concepts/oauth-2', 'concepts/pkce']
+---
+
+An SSH key is a pair of mathematically linked files: a **private key** you keep on your machine and never share, and a **public key** you hand out freely. The server stores the public half. When you connect, the server sets a puzzle that only the holder of the private half can solve — and your private key never leaves your laptop to do it.
+
+That last sentence is the whole point. With a password, you transmit the secret itself on every login, and the server has to store something derived from it. With a key, the secret stays put and only a proof of possession travels.
+
+## Why Not Just Use a Password?
+
+Passwords fail on servers for reasons that have nothing to do with how strong the password is:
+
+- **They're guessable at scale.** Any server with port 22 open to the internet gets thousands of automated login attempts a day. A keypair with 256 bits of entropy isn't brute-forceable; a password a human can remember often is.
+- **They're replayable.** Anyone who captures the password — a compromised jump host, a shoulder-surfed terminal, a logged connection string — can log in as you forever.
+- **They don't scale to fleets.** Twenty servers means twenty places the password (or its hash) lives. Rotating it is a coordinated migration.
+- **They can't be automated safely.** CI pipelines and deploy scripts need non-interactive access, and the usual answer is pasting a password into a config file.
+
+<Callout type="insight">
+  The real upgrade isn't "longer secret." It's that the secret is never transmitted at all, so
+  capturing the traffic — or even compromising the server — doesn't hand an attacker the ability
+  to impersonate you.
+</Callout>
+
+## How the Handshake Actually Works
+
+The exchange is a challenge-response over an already-encrypted channel. SSH first negotiates an encrypted transport (that's a separate key exchange, usually Diffie-Hellman), and only then does user authentication happen inside it.
+
+<Mermaid caption="Public key authentication: the private key signs, it never travels">{`sequenceDiagram
+    participant C as Client
+    participant S as Server
+    C->>S: I want to log in as deploy, using key fingerprint SHA256 abc
+    S->>S: Look for that key in ~/.ssh/authorized_keys
+    S-->>C: Session-bound challenge
+    C->>C: Sign challenge with the private key
+    C->>S: Signature
+    S->>S: Verify signature with the stored public key
+    S-->>C: Authenticated`}</Mermaid>
+
+Three properties fall out of this:
+
+1. **The private key never crosses the network.** It only ever produces signatures locally.
+2. **The signature is bound to this session.** It includes the session identifier, so a captured signature can't be replayed against a different connection.
+3. **A compromised server can't impersonate you elsewhere.** It only ever held your public key, which is useless for signing.
+
+## The Files on Disk
+
+A keypair is two files in `~/.ssh/`:
+
+```txt
+~/.ssh/
+├── id_ed25519          # private key — never leaves this machine
+├── id_ed25519.pub      # public key — safe to paste anywhere
+├── known_hosts         # server keys you've accepted before
+└── config              # per-host settings
+```
+
+The public key is a single line you copy into the server's `~/.ssh/authorized_keys`:
+
+```txt
+ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIH9Kx... abid@laptop
+```
+
+Three fields: the algorithm, the key material, and a free-text comment. The comment is not verified by anything — it exists purely so a human reading `authorized_keys` six months from now can tell which key belongs to whom. Fill it in properly; an `authorized_keys` file full of anonymous keys is a file nobody will ever dare to prune.
+
+## Choosing an Algorithm
+
+```bash
+# The modern default.
+ssh-keygen -t ed25519 -C "abid@laptop"
+
+# Only if you must talk to something too old to support Ed25519.
+ssh-keygen -t rsa -b 4096 -C "abid@laptop"
+```
+
+| Type      | Key size    | Speed   | Use it?                                     |
+| --------- | ----------- | ------- | ------------------------------------------- |
+| `ed25519` | 256-bit     | Fastest | Yes — the default for anything new           |
+| `rsa`     | 4096-bit    | Slower  | Only for legacy servers without Ed25519 support |
+| `ecdsa`   | 256/384-bit | Fast    | Works, but no advantage over Ed25519         |
+| `dsa`     | 1024-bit    | —       | No. Removed from modern OpenSSH entirely     |
+
+Ed25519 keys are short, fast to verify, and have no parameter choices to get wrong — RSA's security depends on picking a large enough modulus, and plenty of old tutorials still say 2048.
+
+<Callout type="warning" title="Key size is not the comparison">
+  A 256-bit Ed25519 key is not weaker than a 4096-bit RSA key. The numbers count different
+  things — Ed25519's 256 bits are elliptic-curve bits, roughly comparable in strength to RSA at
+  3072 bits. Comparing the digits directly is meaningless.
+</Callout>
+
+## The Passphrase and the Agent
+
+`ssh-keygen` asks for a passphrase. It's optional, and skipping it is the single most common mistake.
+
+Without a passphrase, the private key file is a plaintext credential. Anyone who reads that file — malware, a synced backup, a borrowed laptop, an over-broad `tar` of your home directory — has your access to every server that trusts it. With a passphrase, the file is encrypted at rest and useless on its own.
+
+The reason people skip it is that typing a passphrase on every connection is miserable. That's what `ssh-agent` is for: you unlock the key once, and the agent holds the decrypted key in memory and answers challenges on your behalf.
+
+```bash
+# Start the agent and add the key (macOS stores the passphrase in the Keychain).
+eval "$(ssh-agent -s)"
+ssh-add --apple-use-keychain ~/.ssh/id_ed25519
+
+# Linux: add with a timeout so it doesn't sit unlocked all week.
+ssh-add -t 8h ~/.ssh/id_ed25519
+
+ssh-add -l   # what the agent currently holds
+```
+
+<Tradeoff
+  optionA="No passphrase"
+  optionB="Passphrase + agent"
+  a={[
+    'Works unattended, no prompts',
+    'Private key file is a plaintext credential',
+    'File theft is instant, total compromise',
+  ]}
+  b={[
+    'Key file is encrypted at rest and useless alone',
+    'Unlock once per session via ssh-agent',
+    'Compromise requires both the file and the passphrase',
+  ]}
+  recommendation="Always use a passphrase for human keys and let ssh-agent handle the ergonomics. Unattended keys for CI are the narrow exception — and those should be scoped, separate, and short-lived rather than passphrase-free copies of your personal key."
+/>
+
+## Server-Side Hardening
+
+Adding keys is only half the job. If password authentication is still enabled, you've added a strong door next to the weak one you left open.
+
+```txt
+# /etc/ssh/sshd_config
+PubkeyAuthentication yes
+PasswordAuthentication no
+PermitRootLogin no
+ChallengeResponseAuthentication no
+```
+
+<Callout type="danger" title="Verify before you disconnect">
+  Never restart `sshd` after disabling password auth without confirming key login works in a
+  second, still-open session. If your key isn't set up correctly, that restart locks you out of
+  the machine — and on a remote box with no console access, that means a rebuild.
+</Callout>
+
+Permissions matter too, and the failure is silent-ish: `sshd` refuses to use `authorized_keys` if the file or directory is group- or world-writable, and the client refuses to use an over-permissive private key.
+
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/authorized_keys
+chmod 600 ~/.ssh/id_ed25519
+chmod 644 ~/.ssh/id_ed25519.pub
+```
+
+## Host Keys: The Direction People Forget
+
+Everything so far is the server verifying you. The server also has a keypair, and `known_hosts` is your record of which server key you accepted for which hostname. That's the half that protects you from connecting to an impostor.
+
+So when you see this, read it before you type anything:
+
+```txt
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@    WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED!     @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+```
+
+It means the server presented a different key than the one you trusted last time. Sometimes that's benign — the box was rebuilt, or you're reusing an IP from a cloud pool. Sometimes it's a machine-in-the-middle. The fix is to confirm the new fingerprint out of band (from your provider's console, or the person who rebuilt it) and *then* remove the stale entry:
+
+```bash
+ssh-keygen -R server.example.com
+```
+
+<Callout type="warning">
+  Deleting `known_hosts` to make the warning go away is the security equivalent of clipping the
+  wire to a smoke alarm. Also avoid `StrictHostKeyChecking=no` in scripts — it disables exactly
+  the protection this file exists to provide.
+</Callout>
+
+## What to Look Closely At
+
+The failure modes worth internalising, in rough order of how often they cause real incidents:
+
+- **Key sprawl.** People generate one key and copy it to every machine they own. The blast radius of one stolen laptop then equals every server you can reach. Prefer one key per device, so revoking a device is one line removed per server rather than a fleet-wide rotation.
+- **Nothing expires.** Unlike a JWT, an SSH key in `authorized_keys` has no `exp` claim — it works until someone deletes that line. Ex-employees' keys sitting on production servers is a genuinely common audit finding. Someone has to own the pruning.
+- **Copied private keys.** A private key that appears in a Docker image, a CI secret shared across repos, or a dotfiles repo is compromised whether or not anyone noticed. It should be treated as compromised and rotated, not quietly reused.
+- **Agent forwarding (`-A`).** Forwarding your agent to a remote host lets anyone with root on that host use your loaded keys for as long as you're connected. Use `ProxyJump` instead, which tunnels through the bastion without exposing your agent to it.
+- **The comment field left blank.** Six months in, an `authorized_keys` file where nobody knows which key is whose is a file nobody will clean up, which is how the first two problems become permanent.
+
+A `~/.ssh/config` file removes most of the friction that pushes people toward the unsafe shortcuts:
+
+```txt
+Host bastion
+  HostName bastion.example.com
+  User abid
+  IdentityFile ~/.ssh/id_ed25519
+
+Host prod-*
+  User deploy
+  IdentityFile ~/.ssh/id_ed25519_prod
+  ProxyJump bastion          # tunnel through, don't forward the agent
+  IdentitiesOnly yes         # offer only this key, not every key in the agent
+```
+
+`IdentitiesOnly yes` is worth calling out: without it, the client offers every key the agent holds until one is accepted, which both leaks the list of keys you own to that server and can trip `MaxAuthTries` before the right key is reached.
+
+## Beyond authorized_keys: SSH Certificates
+
+At a certain fleet size, `authorized_keys` stops scaling — every new engineer means an update on every host, and every departure means a cleanup you have to trust someone to do.
+
+SSH certificates fix this the way a CA fixes TLS. A trusted authority signs a user's public key into a certificate with an expiry and a principal list; servers are configured to trust the CA rather than individual keys. Access then expires on its own, and revocation is "stop signing for that person" instead of a sweep across hundreds of machines.
+
+<Callout type="insight">
+  The mental shift is the same one JWTs make: from a list the server maintains, to a signed
+  assertion the server can verify on its own. And it inherits the same catch — a certificate is
+  valid until it expires, so keep lifetimes short (hours, not months).
+</Callout>
+
+## Takeaway
+
+An SSH key replaces a transmitted secret with a proof of possession: the private key signs a session-bound challenge and never leaves your machine. Generate `ed25519`, always set a passphrase and let `ssh-agent` handle the typing, disable password auth on the server once you've verified key login in a second session, and never wave away a changed host key. The parts that bite teams later aren't cryptographic — they're operational: keys that never expire, keys copied across every machine, and an `authorized_keys` file nobody can audit.
