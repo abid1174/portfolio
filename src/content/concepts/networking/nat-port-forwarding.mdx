@@ -1,0 +1,223 @@
+---
+title: 'NAT and Port Forwarding: Public Port vs. Listening Port'
+description: 'A packet can arrive at one port number and be delivered to another. Once you know where that rewrite happens, firewall rules stop being guesswork — you allow the port the service actually receives traffic on inside the machine, not the port you typed into the client.'
+type: 'concept'
+category: 'Networking'
+tags: ['NAT', 'Networking', 'Firewall', 'SSH', 'Linux', 'DevOps', 'Ports']
+difficulty: 'beginner'
+readingTime: 11
+publishedAt: '2026-08-29'
+featured: false
+related: ['concepts/ssh-keys', 'concepts/http-1-2-3']
+---
+
+The port number you connect to is not necessarily the port number the service receives. Somewhere between your laptop and the process handling the request, a device can rewrite the destination address and port in the packet header and forward it on. That rewrite is **NAT**, and the specific form used to expose a service is **port forwarding**.
+
+Almost every confusing firewall problem comes from not knowing exactly where in the path that rewrite happens — because a firewall can only filter on what the packet looks like *when it arrives at that host*.
+
+## The Shape of the Problem
+
+A hosting provider gives you a VM. The VM has no public address of its own; the provider owns the public IP and forwards a port to you:
+
+```text
+Public IP:   139.99.120.15
+Public port: 2238  →  your VM's port 22
+```
+
+You connect like this:
+
+```bash
+ssh deploy@139.99.120.15 -p 2238
+```
+
+And then you configure the firewall on the VM — and this is the part that trips people up:
+
+```bash
+ufw allow 22/tcp     # correct
+ufw allow 2238/tcp   # does nothing useful here
+```
+
+`2238` never appears inside your server. By the time the packet reaches the VM's network stack, the destination port has already been rewritten to `22`. The VM has no idea another number was ever involved.
+
+## What NAT Actually Does
+
+NAT is header rewriting plus bookkeeping. A device in the path replaces addresses and ports in the IP and TCP headers, records the mapping in a connection-tracking table, and reverses the substitution on every packet coming back.
+
+There are two directions, and it's worth keeping them apart:
+
+| Form                             | Rewrites               | Typical use                                                    |
+| -------------------------------- | ---------------------- | -------------------------------------------------------------- |
+| **SNAT** / masquerading          | The **source**         | Many private machines share one public IP for outbound traffic |
+| **DNAT** / port forwarding       | The **destination**    | One public IP:port exposes a service on a private machine      |
+
+Port forwarding is DNAT. The provider's edge device holds a rule that means "anything arriving for `139.99.120.15:2238` should be delivered to `10.0.0.7:22` instead", applies it before making a routing decision, and sends the packet on.
+
+<Mermaid caption="The destination port is rewritten before the packet ever reaches your VM">{`flowchart LR
+    A["Your laptop"] -->|"dst 139.99.120.15:2238"| B["Provider NAT / edge router"]
+    B -->|"dst rewritten to 10.0.0.7:22"| C["VM kernel: UFW / nftables"]
+    C -->|"dst port 22"| D["sshd bound to 0.0.0.0:22"]`}</Mermaid>
+
+The bookkeeping half matters too. The NAT device keeps a connection-tracking entry for the flow, so when `sshd` replies from port `22`, the reply is rewritten back to appear to come from `139.99.120.15:2238`. Your client sees a normal conversation with the address it dialled. You never need a matching rule for the return traffic — that's what the state table is for.
+
+## Who Sees Which Port
+
+Lay the same connection out per hop and the firewall question answers itself:
+
+| Hop                    | Destination it sees      | What it can filter on |
+| ---------------------- | ------------------------ | --------------------- |
+| Your laptop            | `139.99.120.15:2238`     | The public port       |
+| Provider NAT           | `2238`, rewrites to `22` | Both — it's the translator |
+| VM kernel / UFW        | `10.0.0.7:22`            | The **internal** port |
+| `sshd`                 | `:22`                    | The internal port     |
+
+<Decision title="Which port goes in the firewall rule?" choice="The port the service actually receives traffic on inside that machine.">
+  A host firewall runs in that host's own kernel and inspects packets as they arrive there. Any
+  translation that happened upstream is already applied and invisible. So the rule follows the
+  listening port, never the number you typed into the client.
+</Decision>
+
+The same logic scales to anything else the provider forwards:
+
+```text
+Public :8080  →  VM :80
+Public :8443  →  VM :443
+```
+
+```bash
+ufw allow 80/tcp
+ufw allow 443/tcp     # not 8080 or 8443
+```
+
+<Callout type="insight">
+  The general rule is that a firewall filters on the packet as it looks *at that hop*. Change your
+  vantage point — laptop, NAT box, VM, container — and the same connection legitimately has
+  different port numbers. There is no single "the port"; there's a port per layer.
+</Callout>
+
+## The Exception That Proves the Rule
+
+Now change one thing: move the SSH daemon itself off `22`.
+
+```text
+# /etc/ssh/sshd_config
+Port 2238
+```
+
+If the provider then forwards `2238 → 2238`, the VM really does receive traffic on `2238`, and the firewall rule has to follow:
+
+```bash
+ufw allow 2238/tcp
+```
+
+Nothing about the principle changed — the listening port changed, and the rule tracks the listening port. This is also why the named UFW profiles are a small trap once you move a service:
+
+```bash
+ufw allow ssh          # resolves via /etc/services → port 22
+ufw allow OpenSSH      # an app profile that also means port 22
+```
+
+Both hardcode `22`. Move `sshd` to `2238` and they silently protect the wrong port. Prefer the explicit `ufw allow 2238/tcp` whenever a service isn't on its default.
+
+<Callout type="danger" title="Order matters, and the mistake is unrecoverable remotely">
+  Running `ufw enable` before allowing your SSH port drops your own session and every future one.
+  On a box with no console access that means a rebuild. Always add the allow rule first, and
+  verify key login in a second, still-open session before touching the firewall or restarting
+  `sshd`.
+</Callout>
+
+## Stop Guessing: Ask the Machine
+
+Every question here is answerable with a command, and guessing is what turns a five-minute problem into an afternoon.
+
+**What is actually listening, and on which interface?**
+
+```bash
+sudo ss -tlnp
+# LISTEN 0 128 0.0.0.0:22    0.0.0.0:*  users:(("sshd",pid=812,fd=3))
+# LISTEN 0 511 127.0.0.1:3000 0.0.0.0:* users:(("node",pid=1493,fd=18))
+```
+
+Read both columns. `0.0.0.0:22` accepts connections from anywhere. `127.0.0.1:3000` accepts **only** connections originating on the machine itself — no amount of NAT or firewall rules will expose it, because the packet is refused before any of that matters. A service bound to loopback that "isn't reachable" is not a firewall problem.
+
+**What does the firewall believe?**
+
+```bash
+sudo ufw status verbose
+sudo iptables -t nat -L PREROUTING -n -v   # local DNAT rules, if any
+```
+
+**Is the path open from outside?**
+
+```bash
+nc -vz 139.99.120.15 2238        # from your laptop, not the server
+ssh -v deploy@139.99.120.15 -p 2238
+```
+
+The failure mode tells you where the problem is, and this distinction is worth internalising:
+
+| Symptom                    | Usually means                                                                     |
+| -------------------------- | ---------------------------------------------------------------------------------- |
+| `Connection refused`       | A packet reached something that actively said no — nothing listening on that port, or a `reject` rule. The path works |
+| `Connection timed out`     | The packet was silently dropped — a missing NAT rule, a `deny`/`DROP` firewall, or the wrong address entirely |
+| Connects, then hangs       | Reachable, but the service is unhealthy or something is blocking the reply direction |
+| `Permission denied` in SSH | The network is fine; this is authentication — keys, modes, or the wrong user       |
+
+UFW's default deny policy drops rather than rejects, which is why a blocked port times out instead of refusing. That's deliberate — a dropped packet reveals nothing to a port scanner — but it does mean "timeout" is the expected symptom of a rule you forgot.
+
+## Three Independent Layers
+
+In a typical hosted setup there are three separate gates, and a request has to pass all of them. They fail in ways that look identical from the outside, so it helps to name them:
+
+```text
+1. Provider NAT / security group   →  is the public port forwarded at all?
+2. VM firewall (UFW / nftables)    →  is the internal port allowed?
+3. Service bind address            →  is it listening on 0.0.0.0 or just 127.0.0.1?
+```
+
+Work from the outside in. If `nc -vz` from your laptop times out, layers 1 or 2 are the problem. If it connects from your laptop but the app doesn't answer, look at layer 3 — or at whatever proxy sits in front of it.
+
+## When a Reverse Proxy Is Involved
+
+Platforms that run containers behind a reverse proxy — Traefik, Caddy, nginx, and the deployment tools built on them — add one more translation *inside* the VM:
+
+<Mermaid caption="Two translations: one at the provider's edge, one inside the VM">{`flowchart TD
+    A["Internet"] -->|":80 / :443"| B["Provider NAT"]
+    B --> C["VM :80 / :443"]
+    C --> D["Reverse proxy"]
+    D -->|"routes by hostname"| E["App A container :3000"]
+    D -->|"routes by hostname"| F["App B container :8000"]`}</Mermaid>
+
+The firewall on the VM still only cares about `80` and `443` — the ports the proxy receives on. The container ports behind it are never exposed directly and should not be opened; that's the entire point of putting a proxy in front. Applications behind such a proxy should bind to `127.0.0.1` or to an internal container network, not `0.0.0.0`.
+
+<Tradeoff
+  optionA="Publish the app on 0.0.0.0"
+  optionB="Bind to 127.0.0.1, proxy in front"
+  a={[
+    'Reachable immediately for testing',
+    'Every port is a separate thing to firewall correctly',
+    'One forgotten rule exposes an app with no TLS and no auth',
+    'Bypasses the proxy, so logging, rate limits and headers do not apply',
+  ]}
+  b={[
+    'Only 80 and 443 are ever reachable from outside',
+    'TLS, hostnames and access rules are terminated in one place',
+    'The firewall surface stays small enough to actually audit',
+    'Requires the proxy to be configured before anything is reachable',
+  ]}
+  recommendation="Expose the proxy, never the app. Keeping application ports on loopback means a firewall mistake can't expose them, which is a much better failure mode than relying on remembering a deny rule for every service you deploy."
+/>
+
+## Traps Worth Knowing About
+
+- **Docker publishes ports around UFW.** `docker run -p 8080:80` inserts DNAT rules that are evaluated in `PREROUTING` and traverse the `FORWARD` chain — not the `INPUT` chain where UFW's rules live. The result is a container reachable from the internet while `ufw status` insists the port is denied. Publish as `-p 127.0.0.1:8080:80` so the mapping is loopback-only, and let the reverse proxy handle external traffic.
+- **IPv6 often has no NAT at all.** If your VM has a routable IPv6 address, traffic reaches it directly on the real port with nothing rewritten — the public port and the internal port are the same, and any assumption built on the NAT mapping doesn't hold. Check `ss -tlnp` for `[::]:` listeners and make sure your rules cover both families.
+- **Cloud security groups are a fourth layer.** AWS, GCP and Azure filter before the packet reaches the instance, and their rules refer to the port the instance receives. A correct UFW rule with a closed security group still times out.
+- **Hairpin NAT usually doesn't work.** Connecting to `139.99.120.15:2238` *from the server itself* frequently fails, because the NAT device only translates traffic arriving from outside. That's a property of the NAT, not a sign your setup is broken — test from an external network.
+- **The app doesn't know the public port.** A service behind NAT and a proxy sees the internal port, so anything that builds absolute URLs from the request will generate wrong links unless the proxy sends `X-Forwarded-Proto`, `X-Forwarded-Host` and `X-Forwarded-Port` and the app is configured to trust them.
+- **NAT mappings expire.** Connection-tracking entries are dropped after an idle timeout, which is why long-lived idle SSH sessions die silently. `ServerAliveInterval 60` in `~/.ssh/config` keeps the flow warm so the mapping survives.
+
+## Takeaway
+
+NAT rewrites addresses and ports in flight, and a host firewall can only ever match what arrives at that host. When a provider forwards public `2238` to your VM's `22`, the VM sees `22` — so the rule is `ufw allow 22/tcp`, and `2238` is purely the provider's business. Change `sshd` to listen on `2238` and forward `2238 → 2238`, and the rule follows the listening port there too.
+
+The question to ask every time, instead of copying the number out of your SSH command, is: **what port is the service actually receiving traffic on inside this machine?** Answer it with `ss -tlnp` rather than from memory, check the bind address in the same breath, and remember that the provider's NAT, the VM's firewall and the service's bind address are three separate gates that all have to agree.
