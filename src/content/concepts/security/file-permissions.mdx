@@ -1,0 +1,345 @@
+---
+title: 'chmod, chown and What 600 Actually Means'
+description: 'Every file on a Unix system carries an owner, a group and nine permission bits. This is what those bits mean, why 600 and 700 keep showing up, how the octal digits are built, and the rules that make permissions behave differently than most people assume.'
+type: 'concept'
+category: 'Security'
+tags: ['Linux', 'Unix', 'Permissions', 'Security', 'DevOps', 'CLI']
+difficulty: 'beginner'
+readingTime: 11
+publishedAt: '2026-08-29'
+featured: false
+related: ['concepts/ssh-keys']
+---
+
+Every file and directory on a Unix system carries three pieces of access metadata: an **owner** (a user), a **group**, and a **mode** — nine permission bits saying what the owner, the group and everyone else may do with it. `chown` changes the first two. `chmod` changes the third. That's the whole model, and almost every permissions problem is a misunderstanding of one of the details underneath it.
+
+The details are where it gets interesting, because `rwx` means something different on a directory than on a file, and the three permission classes are not additive the way people expect.
+
+## Reading `ls -l`
+
+Everything starts here:
+
+```txt
+-rw-------  1 abid  staff   464 Aug 29 21:04 id_ed25519
+drwx------  5 abid  staff   160 Aug 29 21:04 .ssh
+-rwxr-xr-x  1 abid  staff  1204 Aug 29 20:11 deploy.sh
+```
+
+The first column is ten characters, and it splits into four parts:
+
+```txt
+ -    rw-      ---      ---
+ │     │        │        │
+ │     │        │        └── other: everyone else
+ │     │        └─────────── group: members of the file's group
+ │     └──────────────────── user:  the file's owner
+ └────────────────────────── type:  - file, d directory, l symlink
+```
+
+| Column | Meaning                                                                 |
+| ------ | ----------------------------------------------------------------------- |
+| 1      | Entry type — `-` file, `d` directory, `l` symlink, `s` socket, `p` pipe  |
+| 2–4    | What the **owner** may do                                               |
+| 5–7    | What members of the **group** may do                                    |
+| 8–10   | What **everyone else** may do                                           |
+
+So `-rw-------` reads as: a regular file, the owner can read and write it, and nobody else can do anything at all. That's mode `600`. And `drwx------` is a directory the owner can fully use and nobody else can even enter — mode `700`.
+
+The two numbers after the mode are the owner and the group: `abid staff`. Those come from `chown`, not `chmod`, and confusing the two is the most common reason a "permissions fix" doesn't fix anything.
+
+## What r, w and x Actually Permit
+
+This is the part worth slowing down on, because the three letters mean genuinely different things depending on what they're attached to.
+
+**On a file:**
+
+| Bit | Value | On a file                                                        |
+| --- | ----- | ---------------------------------------------------------------- |
+| `r` | 4     | Read the contents — `cat`, `cp`, open for reading                 |
+| `w` | 2     | Modify the contents. **Not** the right to delete the file         |
+| `x` | 1     | Execute it as a program or script                                 |
+
+**On a directory:**
+
+| Bit | Value | On a directory                                                                    |
+| --- | ----- | ---------------------------------------------------------------------------------- |
+| `r` | 4     | List the *names* inside it — `ls`                                                   |
+| `w` | 2     | Create, rename and delete entries inside it (requires `x` too)                      |
+| `x` | 1     | Enter it — traverse into it, and access a known path through it                     |
+
+<Callout type="insight" title="Deleting a file is a directory operation">
+  Removing a file needs **write permission on the directory that contains it**, not on the file
+  itself. That is why you can `rm` a read-only file you don't own out of a directory you control,
+  and why you can't delete your own file from a directory you can only read. The directory holds
+  the name; the file just holds the bytes.
+</Callout>
+
+The split between `r` and `x` on a directory is the one that produces the strangest symptoms:
+
+- `r` without `x` — you can list the names but can't `stat` any of them. `ls` prints the entries, `ls -l` shows `???` or permission errors on every line.
+- `x` without `r` — you can't list the directory, but you *can* access any path you already know. This is a real pattern: mode `711` on a home directory lets a web server reach `~/public_html` without letting anyone enumerate the rest of your home.
+- `w` without `x` — useless. You can't create anything in a directory you can't enter.
+
+## The Three Classes Are Not Cumulative
+
+Most people read `rw-r--r--` as a set of rights that stack up. They don't. The kernel picks **exactly one** class and ignores the other two:
+
+<Mermaid caption="Permission check: the first matching class wins, and the rest are never consulted">{`flowchart TD
+    A["Process wants to open a file"] --> B{"Is the caller the file's owner?"}
+    B -- yes --> C["Use the owner bits only"]
+    B -- no --> D{"Is the caller in the file's group?"}
+    D -- yes --> E["Use the group bits only"]
+    D -- no --> F["Use the other bits"]
+    C --> G["Allow or deny"]
+    E --> G
+    F --> G`}</Mermaid>
+
+The consequence is a mode that looks impossible: `r--rw-rw-` (`466`) means the owner can read but **not** write the file, while everyone else can write it freely. Being the owner doesn't grant you the group's or other's rights — it takes you out of those classes entirely.
+
+This matters in practice when a service runs as the file's owner and you "fixed" access by loosening the group bits. If the process is the owner, the group bits it was granted are never even looked at.
+
+<Callout type="note">
+  The owner can always run `chmod` on their own file, so this is rarely a real lockout — it just
+  means the failure is one step further away than it looks. Also note that permissions are checked
+  at `open()` time; a process that already has a file open keeps its access even if you change the
+  mode underneath it.
+</Callout>
+
+## Where the Octal Digits Come From
+
+Each class is three bits, and three bits is one octal digit. Read `rwx` as binary, with `r=4`, `w=2`, `x=1`, and add them up:
+
+| Digit | Bits  | Symbolic | Means                    |
+| ----- | ----- | -------- | ------------------------ |
+| 0     | `000` | `---`    | Nothing                  |
+| 1     | `001` | `--x`    | Execute / traverse only  |
+| 2     | `010` | `-w-`    | Write only               |
+| 3     | `011` | `-wx`    | Write and execute        |
+| 4     | `100` | `r--`    | Read only                |
+| 5     | `101` | `r-x`    | Read and execute         |
+| 6     | `110` | `rw-`    | Read and write           |
+| 7     | `111` | `rwx`    | Everything               |
+
+Three digits, one per class, in the order **user, group, other**. That's all a mode is:
+
+```txt
+  6      0      0
+  │      │      │
+  │      │      └── other: 0 = ---   nothing
+  │      └───────── group: 0 = ---   nothing
+  └──────────────── user:  6 = rw-   read + write
+```
+
+The two modes that dominate a security-conscious setup:
+
+- **`600` — `rw-------`.** The owner reads and writes; nobody else has any access. This is the mode for anything secret: private keys, `.env` files, credential files, `authorized_keys`.
+- **`700` — `rwx------`.** The directory equivalent. The owner can enter, list and modify; nobody else can even traverse it. This is the mode for `~/.ssh`, `~/.gnupg`, and any directory holding secrets.
+
+Note that `600` on a directory would be nearly useless — no `x` means nobody can enter it, owner included. Directories almost always need their `x` bit, which is why the useful directory modes are `700`, `750` and `755` rather than `600`, `640` and `644`.
+
+The full working set:
+
+| Mode  | Symbolic     | Typical use                                                          |
+| ----- | ------------ | --------------------------------------------------------------------- |
+| `600` | `rw-------`  | Private keys, `.env`, `authorized_keys`, any secret file               |
+| `640` | `rw-r-----`  | Config with secrets, readable by a service's group                    |
+| `644` | `rw-r--r--`  | Ordinary readable files — `.pub` keys, static assets, public config   |
+| `700` | `rwx------`  | Private directories — `~/.ssh`, `~/.gnupg`                            |
+| `750` | `rwxr-x---`  | Directory shared with one group, closed to everyone else              |
+| `755` | `rwxr-xr-x`  | Directories and executables everyone may use but only the owner edits |
+| `775` | `rwxrwxr-x`  | Group-writable shared directory                                       |
+| `777` | `rwxrwxrwx`  | Everyone can do everything. Effectively "permissions off"             |
+
+## chmod: Numeric and Symbolic
+
+`chmod` writes the mode. It takes two forms, and both are worth knowing because they do different jobs.
+
+**Numeric** sets all nine bits at once — absolute, predictable, and destructive of whatever was there:
+
+```bash
+chmod 600 ~/.ssh/id_ed25519
+chmod 700 ~/.ssh
+chmod 755 deploy.sh
+```
+
+**Symbolic** adjusts specific bits and leaves the rest alone:
+
+```bash
+chmod u+x deploy.sh        # give the owner execute
+chmod go-rwx secrets.env   # strip group and other entirely
+chmod a+r README.md        # readable by all (a = ugo)
+chmod u=rw,go= config.yml  # exactly 600, written symbolically
+chmod g+s /srv/shared      # set the setgid bit (more on this below)
+```
+
+The grammar is `[who][operator][permissions]`:
+
+| Part        | Values                                                                 |
+| ----------- | ---------------------------------------------------------------------- |
+| Who         | `u` user, `g` group, `o` other, `a` all (default if omitted)            |
+| Operator    | `+` add, `-` remove, `=` set exactly (clears unlisted bits for that who) |
+| Permissions | `r`, `w`, `x`, plus `X`, `s`, `t`                                       |
+
+Use numeric when you know the exact end state you want — secrets, keys, anything where "and nothing else" is part of the requirement. Use symbolic when you want one targeted change, like adding an execute bit, without disturbing the rest.
+
+<Callout type="warning" title="chmod -R is where people break things">
+  `chmod -R 644 /srv/app` strips the execute bit from every **directory** under `/srv/app`, and
+  now nothing can enter them. The app breaks in a way that looks nothing like a permissions
+  problem. Recursive numeric modes apply the same digits to files and directories, which are
+  exactly the two things that need different digits.
+</Callout>
+
+The fix is the capital `X`, which means "execute, but only for directories and for files that are already executable by someone":
+
+```bash
+# Directories become traversable, plain files don't become executable.
+chmod -R u=rwX,go=rX /srv/app
+
+# Or split the two explicitly.
+find /srv/app -type d -exec chmod 755 {} +
+find /srv/app -type f -exec chmod 644 {} +
+```
+
+## Why New Files Aren't 666: umask
+
+Files are created by `open()` with a requested mode of `666` and directories with `777`. You never see those numbers because the shell's **umask** masks bits off at creation time.
+
+```bash
+umask          # 022 on most systems
+umask -S       # u=rwx,g=rx,o=rx — the same thing, readably
+```
+
+A umask of `022` clears the write bit for group and other:
+
+```txt
+files:        666 & ~022  =  644   (rw-r--r--)
+directories:  777 & ~022  =  755   (rwxr-xr-x)
+```
+
+Two things follow. First, the execute bit is never granted at creation — a new script is always non-executable until you `chmod +x` it, no matter what your umask says. Second, if you want new files to be private by default, `umask 077` gives you `600` files and `700` directories. That's a sensible default in a shell profile on a shared machine, and it's what most tools that create key material apply to themselves anyway.
+
+<Callout type="tip">
+  umask only applies at creation. It never changes an existing file, and it can't tighten
+  something that's already loose — that's what `chmod` is for.
+</Callout>
+
+## chown: Who the File Belongs To
+
+`chmod` decides what each class may do. `chown` decides **who is in which class**. They solve different halves of the same problem, and reaching for `chmod` when the real issue is ownership is how `777` happens.
+
+```bash
+chown deploy file.txt              # change the owner
+chown deploy:www-data file.txt     # change owner and group
+chown :www-data file.txt           # change only the group
+chgrp www-data file.txt            # same thing, dedicated command
+chown -R deploy:deploy /srv/app    # recurse
+```
+
+The rules around who may run it are strict, and for good reason:
+
+- **Only root can give a file away.** A regular user cannot change a file's owner — not even to hand their own file to someone else. If they could, you could dodge disk quotas, and on a setuid binary you could manufacture a file owned by another user.
+- **The owner can change the group**, but only to a group they are a member of.
+- **`chown` follows symlinks by default.** `chown -h` changes the link itself instead of its target — which matters when the target is something you didn't mean to touch.
+
+The permission error that ownership actually explains looks like this: a web server running as `www-data` can't write to an upload directory owned by `abid:abid` with mode `755`. The mode isn't the problem — `www-data` lands in the "other" class, which has no `w`. `chmod 777` would "fix" it by giving the entire machine write access. The real fix is `chown -R abid:www-data uploads` plus `chmod 775`, so the server reaches the directory through the *group* class.
+
+<Tradeoff
+  optionA="chmod 777"
+  optionB="Correct ownership + group bits"
+  a={[
+    'Works immediately, no thinking required',
+    'Every user and every process on the box can read, write and delete',
+    'A compromised unrelated service can now rewrite your files',
+    'Some daemons refuse world-writable paths outright, so it can even fail',
+  ]}
+  b={[
+    'Requires knowing which user the service runs as',
+    'Access is scoped to exactly the processes that need it',
+    'Survives audits and stays correct as the machine grows',
+    'Group membership is the intended mechanism for exactly this',
+  ]}
+  recommendation="Treat 777 as a diagnostic, never a fix. If it makes the problem go away, you've learned the issue is genuinely permissions — now put the file in the right group and set 775 or 750 instead. A 777 in a deploy script is a permanent hole created to save thirty seconds."
+/>
+
+## The Fourth Digit: setuid, setgid and Sticky
+
+Modes can carry a fourth leading digit for three special bits. You'll meet them in `ls` output as letters sitting in the execute positions.
+
+| Bit     | Value | On a file                               | On a directory                                        |
+| ------- | ----- | --------------------------------------- | ----------------------------------------------------- |
+| setuid  | 4     | Runs as the file's **owner**            | Nothing (ignored on Linux)                            |
+| setgid  | 2     | Runs as the file's **group**            | New entries inherit the directory's group             |
+| sticky  | 1     | Nothing on modern systems               | Only an entry's owner may delete it                   |
+
+```bash
+chmod 4755 /usr/bin/passwd    # -rwsr-xr-x  setuid root
+chmod 2775 /srv/shared        # drwxrwsr-x  setgid, group-inheriting
+chmod 1777 /tmp               # drwxrwxrwt  sticky
+```
+
+Three things to take from this:
+
+- **setuid is how `passwd` works.** Changing your password means writing to `/etc/shadow`, which is `600 root:root`. The binary is owned by root with the setuid bit, so it runs with root's privileges regardless of who launched it. It is also, for exactly that reason, the classic privilege-escalation target — a setuid binary that can be tricked into running arbitrary code is an instant root shell.
+- **setgid on a directory is the right answer to shared folders.** Every file created inside inherits the directory's group, so a team can collaborate without anyone remembering to run `chgrp`. This plus `775` replaces almost every legitimate reason someone reaches for `777`.
+- **The sticky bit is why `/tmp` works.** `/tmp` is world-writable so any process can create files there, but the sticky bit means you can only delete your *own* entries. Without it, world-writable plus the "deletion is a directory operation" rule would let anyone delete anyone's temp files.
+
+<Callout type="note" title="Reading s, S, t and T">
+  In `ls` output these bits replace the `x` they sit on: lowercase `s`/`t` means the execute bit is
+  also set, uppercase `S`/`T` means it isn't. A capital letter is usually a mistake — `-rwSr--r--`
+  is a setuid file that can't be executed, which does nothing at all.
+</Callout>
+
+## Why SSH Is So Strict About This
+
+The permissions rules stop being abstract the moment you set up key-based login, because `sshd` and `ssh` both refuse to work with over-permissive files.
+
+```bash
+chmod 700 ~/.ssh
+chmod 600 ~/.ssh/id_ed25519
+chmod 600 ~/.ssh/authorized_keys
+chmod 644 ~/.ssh/id_ed25519.pub
+```
+
+On the client, a private key readable by group or other produces a hard refusal:
+
+```txt
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+@         WARNING: UNPROTECTED PRIVATE KEY FILE!          @
+@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+Permissions 0644 for 'id_ed25519' are too open.
+```
+
+On the server, `sshd` runs a `StrictModes` check and ignores `authorized_keys` entirely if that file, `~/.ssh`, or **your home directory itself** is group- or world-writable. The last one catches people out: `~` at `775` is enough to make key auth silently fail while the logs say only "Authentication refused: bad ownership or modes". The reasoning is sound — if anyone else can write to your home directory, they can replace your `authorized_keys` and grant themselves your access.
+
+## What to Look Closely At
+
+The failures that actually cost time, roughly in order of frequency:
+
+- **Recursive numeric chmod on a tree.** `chmod -R 644` strips traversal from every directory under it. Use `u=rwX,go=rX`, or split files and directories with `find`.
+- **Reaching for `chmod` when the problem is `chown`.** If a service can't write a file, the first question is what user the service runs as, not what the mode is. Loosening bits is treating the symptom.
+- **`777` left behind in a script.** It's almost always a debugging step that got committed. It is also self-defeating: `sshd`, `sudo`, cron and several web servers refuse world-writable configuration outright.
+- **`chown -R` with a wrong path.** `chown -R deploy:deploy /` or a stray space in `chown -R deploy /srv /app` will happily rewrite ownership across the system and can leave a machine unbootable. There is no undo. Check the path before pressing enter, and prefer running it against a specific directory rather than a variable that might be empty.
+- **Assuming root respects the mode.** Root bypasses permission checks entirely, so `600` protects a secret from other users, not from anyone who can become root or read the disk. The one exception on Linux is executing a file: even root needs at least one execute bit set somewhere in the mode.
+- **The execute bit vs the shebang.** A script needs `x` to be run as `./script.sh`, but `bash script.sh` only needs `r`. If a script "works one way and not the other", that's the bit that's missing.
+- **Permissions aren't the whole story on every system.** POSIX ACLs (`getfacl`/`setfacl`), SELinux or AppArmor labels, mount options like `noexec` and `ro`, and container user namespaces can all deny access that the mode appears to allow. A `+` at the end of the `ls -l` mode string means an ACL is present and `ls` isn't showing you everything.
+
+Two commands worth having in your fingers for inspecting rather than guessing:
+
+```bash
+# Linux (GNU coreutils)
+stat -c '%a %A %U %G %n' ~/.ssh/*
+
+# macOS / BSD
+stat -f '%OLp %Sp %Su %Sg %N' ~/.ssh/*
+
+# Anywhere: what's the mode on every component of a path?
+namei -l /srv/app/uploads/file.txt
+```
+
+`namei -l` is the underrated one. A file at `644` inside a directory chain where one link is `700` and owned by someone else is inaccessible, and printing the whole path shows you which component is actually blocking you.
+
+## Takeaway
+
+A Unix file has an owner, a group, and nine bits. `chown` decides which class a given process falls into; `chmod` decides what that class may do. The digits are just `r=4`, `w=2`, `x=1` added up per class — so `600` is "the owner reads and writes, nobody else exists" and `700` is the same thing for a directory you can enter.
+
+The three details that stop permissions from feeling arbitrary: the classes are exclusive rather than cumulative, `rwx` means something different on directories than on files, and deleting a file is governed by the directory that holds it. Once those land, the rest is habit — `600` for secrets, `700` for the directories holding them, `755` for things everyone runs, group ownership instead of `777`, and `namei -l` when a path fails for reasons the file's own mode doesn't explain.
