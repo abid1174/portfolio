@@ -21,8 +21,8 @@ export const site = {
   manifesto:
     'If I cannot explain it clearly, I have not understood it well enough yet. That is the whole editorial policy — write it down, find the gap, rewrite it.',
   social: [
-    { label: 'GitHub', href: 'https://github.com/abidalamin', handle: '@abidalamin' },
-    { label: 'LinkedIn', href: 'https://linkedin.com/in/abidalamin', handle: 'abidalamin' },
+    { label: 'GitHub', href: 'https://github.com/abid1174', handle: '@abid1174' },
+    { label: 'LinkedIn', href: 'https://www.linkedin.com/in/abid1174', handle: 'abid1174' },
   ],
 } as const;
 
