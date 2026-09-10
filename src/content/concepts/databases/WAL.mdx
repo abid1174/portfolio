@@ -42,7 +42,7 @@ The core rule is:
 ## What actually happens when we insert data into PostgreSQL
 
 <Mermaid caption="The lifecycle of an INSERT, from parsing to the page reaching the heap file">{`flowchart TD
-    Parse["Parse and plan<br/>executor builds a HeapTuple"] --> WAL["WAL record written<br/>write-ahead, before the page changes"]
+    Parse["**Parse and plan**<br/>executor builds a HeapTuple"] --> WAL["WAL record written<br/>write-ahead, before the page changes"]
     WAL --> Tuple["Tuple written into page<br/>dirty page in shared_buffers"]
     Tuple --> Commit["COMMIT fsyncs WAL<br/>this is the durability point"]
     Commit --> Flush["Page flushed to heap file<br/>later, by bgwriter or a checkpoint"]`}</Mermaid>
