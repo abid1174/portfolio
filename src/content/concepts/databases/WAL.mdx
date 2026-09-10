@@ -1,0 +1,78 @@
+---
+title: 'What is Write-Ahead Logging (WAL)?'
+description: "Write-Ahead Logging (WAL) is a technique used in databases to ensure data integrity and durability by recording changes to a log before applying them to the database."
+type: 'concept'
+category: 'Databases'
+tags: ['Databases', 'WAL', 'Data Integrity', 'Durability']
+difficulty: 'intermediate'
+readingTime: 6
+publishedAt: '2026-06-15'
+updatedAt: '2026-06-15'
+---
+
+When we run a query like:
+
+```sql
+INSERT INTO users (name, email)
+VALUES ('Abid', 'abid@example.com');
+```
+
+it is tempting to imagine that PostgreSQL simply writes this row directly to the
+database file on disk.
+
+But PostgreSQL does something more interesting.
+
+Before modifying the actual data pages on disk, PostgreSQL first records information
+about the change in a Write-Ahead Log, commonly known as WAL.
+
+This simple idea is one of the fundamental reasons PostgreSQL can provide durability,
+crash recovery, replication, and point-in-time recovery.
+
+Let's understand how it works.
+
+## What is WAL?
+
+WAL stands for Write-Ahead Log.
+
+The core rule is:
+
+> The log describing a change must reach durable storage before the corresponding data
+> page is written to disk.
+
+## What actually happens when we insert data into PostgreSQL
+
+<Mermaid caption="The lifecycle of an INSERT, from parsing to the page reaching the heap file">{`flowchart TD
+    Parse["Parse and plan<br/>executor builds a HeapTuple"] --> WAL["WAL record written<br/>write-ahead, before the page changes"]
+    WAL --> Tuple["Tuple written into page<br/>dirty page in shared_buffers"]
+    Tuple --> Commit["COMMIT fsyncs WAL<br/>this is the durability point"]
+    Commit --> Flush["Page flushed to heap file<br/>later, by bgwriter or a checkpoint"]`}</Mermaid>
+
+## What happens if PostgreSQL crashes?
+
+This is where WAL really shines.
+
+Imagine:
+
+<Mermaid caption="A crash after commit, before the dirty page reaches disk">{`flowchart TD
+    Txn["Transaction"] --> WalWritten["WAL written successfully"]
+    WalWritten --> Commit["COMMIT"]
+    Commit --> ClientAck["Client receives success"]
+    ClientAck --> Crash["💥 Server crashes"]`}</Mermaid>
+
+But suppose the modified table page was still only in memory.
+
+After restarting, PostgreSQL performs crash recovery.
+
+Conceptually:
+
+<Mermaid caption="Crash recovery replays WAL to reach a consistent state">{`flowchart TD
+    Start["Database starts"] --> ReadWal["Read WAL"]
+    ReadWal --> FindChanges["Find changes that need to be replayed"]
+    FindChanges --> Redo["Redo those changes"]
+    Redo --> Consistent["Database reaches a consistent state"]`}</Mermaid>
+
+So the database can reconstruct the required changes from WAL.
+
+This process is often referred to as WAL replay or redo.
+
+
