@@ -1,6 +1,7 @@
 ---
 import { site } from '../data/site';
 import { buildMeta, siteJsonLd, type MetaInput } from '../lib/metadata';
+import MetaPixel from '../components/astro/MetaPixel.astro';
 import '../styles/global.css';
 
 // `pathname` is filled in from `Astro.url`, never passed by callers.
@@ -84,6 +85,12 @@ const graphs = [...siteJsonLd(), ...jsonLd];
       graphs.map((graph) => (
         <script type="application/ld+json" is:inline set:html={JSON.stringify(graph)} />
       ))
+    }
+
+    {
+      // Only fire the pixel from production builds so dev and preview traffic
+      // never pollutes the real audience data.
+      import.meta.env.PROD && <MetaPixel />
     }
   </head>
 

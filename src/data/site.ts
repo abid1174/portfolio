@@ -9,6 +9,8 @@ export const site = {
     'A personal engineering knowledge base: software concepts, system design practices and AI notes, written from real engineering experience.',
   url: 'https://abidalamin.dev',
   locale: 'en_US',
+  /** Meta Pixel ID. Not a secret, so it lives here rather than in an env var. */
+  metaPixelId: '1833299830075526',
   email: 'abidalamin9@gmail.com',
   avatarInitials: 'AA',
   bio: 'I write down what I learn while building backend systems — the concepts underneath, the trade-offs behind the architecture, and how AI actually fits in.',
