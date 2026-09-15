@@ -60,13 +60,35 @@ const items = headings.filter((h) => h.depth > 1 && h.depth <= maxDepth);
 
     let activeId: string | null = null;
 
+    // On the desktop rail the TOC is a capped-height, overflow-auto
+    // sidebar, so `scrollIntoView` only nudges that box. Below the
+    // `68rem` breakpoint (see ArticleLayout.astro) it collapses to a
+    // static strip above the article with nothing left to scroll
+    // internally, so the same call would walk up to the document and
+    // yank the whole page back to the top of the TOC on every section
+    // change. Only auto-scroll when a real internal scroll container
+    // exists.
+    const scrollableAncestor = (el: HTMLElement): Element | null => {
+      let node = el.parentElement;
+      while (node) {
+        const { overflowY } = getComputedStyle(node);
+        if ((overflowY === 'auto' || overflowY === 'scroll') && node.scrollHeight > node.clientHeight) {
+          return node;
+        }
+        node = node.parentElement;
+      }
+      return null;
+    };
+
     const setActive = (id: string | null) => {
       if (id === activeId) return;
       if (activeId) links.get(activeId)?.removeAttribute('aria-current');
       if (id) {
         const link = links.get(id);
         link?.setAttribute('aria-current', 'true');
-        link?.scrollIntoView({ block: 'nearest' });
+        if (link && scrollableAncestor(link)) {
+          link.scrollIntoView({ block: 'nearest' });
+        }
       }
       activeId = id;
     };
