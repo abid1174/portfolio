@@ -1,0 +1,273 @@
+---
+import type { Role } from '../../data/resume';
+import { formatDuration, formatPeriod, roleMonths } from '../../lib/career';
+
+interface Props {
+  roles: Role[];
+}
+
+const { roles } = Astro.props;
+---
+
+<ol class="timeline">
+  {
+    roles.map((role) => (
+      <li class:list={['entry', { 'is-current': !role.end }]}>
+        <span class="marker" aria-hidden="true" />
+
+        <div class="when">
+          <span class="period">{formatPeriod(role)}</span>
+          <span class="duration">
+            {formatDuration(roleMonths(role))}
+            {role.employment === 'Part-time' && ' · Part-time'}
+          </span>
+        </div>
+
+        <article class="card">
+          <header class="card-head">
+            <div>
+              <h3 class="title">{role.title}</h3>
+              <p class="company">
+                {role.company}
+                {!role.end && <span class="now">Now</span>}
+              </p>
+            </div>
+            {role.metric && (
+              <p class="metric">
+                <strong>{role.metric.value}</strong>
+                <span>{role.metric.label}</span>
+              </p>
+            )}
+          </header>
+
+          <p class="summary">{role.summary}</p>
+
+          <ul class="highlights">
+            {role.highlights.map((highlight) => (
+              <li>{highlight}</li>
+            ))}
+          </ul>
+
+          <ul class="stack" aria-label="Technologies">
+            {role.stack.map((tech) => (
+              <li>{tech}</li>
+            ))}
+          </ul>
+        </article>
+      </li>
+    ))
+  }
+</ol>
+
+<style>
+  .timeline {
+    position: relative;
+    display: grid;
+    gap: 1.25rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* The rail runs through the marker column; it is drawn once rather than per entry so the
+     gaps between cards stay continuous. */
+  .timeline::before {
+    content: '';
+    position: absolute;
+    top: 0.5rem;
+    bottom: 0.5rem;
+    left: calc(9.5rem + 1rem);
+    width: 1px;
+    background: var(--border-default);
+  }
+
+  .entry {
+    position: relative;
+    display: grid;
+    grid-template-columns: 9.5rem minmax(0, 1fr);
+    column-gap: 2rem;
+  }
+
+  .marker {
+    position: absolute;
+    top: 1.15rem;
+    left: calc(9.5rem + 1rem - 5px);
+    width: 11px;
+    height: 11px;
+    border: 2px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    background: var(--surface);
+  }
+
+  .is-current .marker {
+    border-color: var(--pillar);
+    background: var(--pillar);
+    box-shadow: 0 0 0 4px var(--pillar-wash);
+  }
+
+  .when {
+    display: grid;
+    align-content: start;
+    gap: 0.2rem;
+    padding-top: 0.95rem;
+    text-align: right;
+  }
+
+  .period {
+    font-family: var(--font-mono);
+    font-size: var(--text-xs);
+    color: var(--text-primary);
+  }
+
+  .duration {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-muted);
+  }
+
+  .card {
+    padding: 1rem 1.15rem 1.1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .is-current .card {
+    border-color: var(--border-default);
+  }
+
+  .card-head {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 1rem;
+  }
+
+  .title {
+    margin: 0;
+    font-size: 1.0625rem;
+    line-height: var(--leading-tight);
+    color: var(--text-primary);
+  }
+
+  .company {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0.2rem 0 0;
+    font-size: var(--text-md);
+    color: var(--text-secondary);
+  }
+
+  .now {
+    padding: 0.05rem 0.4rem;
+    border-radius: var(--radius-full);
+    background: var(--pillar-wash);
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--pillar-dim);
+  }
+
+  .metric {
+    display: grid;
+    flex-shrink: 0;
+    margin: 0;
+    text-align: right;
+  }
+
+  .metric strong {
+    font-size: 1.375rem;
+    line-height: 1;
+    font-variant-numeric: tabular-nums;
+    color: var(--pillar);
+  }
+
+  .metric span {
+    margin-top: 0.2rem;
+    font-family: var(--font-mono);
+    font-size: 0.625rem;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .summary {
+    margin: 0.75rem 0 0;
+    font-size: var(--text-base);
+    line-height: var(--leading-body);
+    color: var(--text-primary);
+  }
+
+  .highlights {
+    display: grid;
+    gap: 0.4rem;
+    margin: 0.6rem 0 0;
+    padding-left: 1.1rem;
+    list-style: disc;
+    font-size: var(--text-md);
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  .highlights li::marker {
+    color: var(--text-muted);
+  }
+
+  .stack {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.3rem;
+    margin: 0.9rem 0 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .stack li {
+    padding: 0.12rem 0.45rem;
+    border-radius: var(--radius-sm);
+    background: var(--surface-inset);
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--text-secondary);
+  }
+
+  /* Below this width the date column steals too much from the card, so dates move above it and
+     the rail shifts to the left edge. */
+  @media (max-width: 44rem) {
+    .timeline::before {
+      left: 5px;
+    }
+
+    .entry {
+      grid-template-columns: minmax(0, 1fr);
+      padding-left: 1.6rem;
+    }
+
+    .marker {
+      top: 0.2rem;
+      left: 0;
+    }
+
+    .when {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      padding: 0 0 0.45rem;
+      text-align: left;
+    }
+
+    .card-head {
+      flex-direction: column;
+      gap: 0.6rem;
+    }
+
+    .metric {
+      display: flex;
+      align-items: baseline;
+      gap: 0.4rem;
+      text-align: left;
+    }
+  }
+</style>

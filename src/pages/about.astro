@@ -1,14 +1,27 @@
 ---
 import PageLayout from '../layouts/PageLayout.astro';
 import SectionHeader from '../components/astro/SectionHeader.astro';
+import ExperienceTimeline from '../components/astro/ExperienceTimeline.astro';
 import InteractiveDiagram from '../components/react/InteractiveDiagram';
 import BrandIcon from '../components/astro/BrandIcon.astro';
-import { Mail } from 'lucide-react';
+import { GraduationCap, Mail } from 'lucide-react';
 import { breadcrumbJsonLd } from '../lib/metadata';
 import { ContentRepository } from '../lib/content';
+import { yearsOfExperience } from '../lib/career';
 import { site } from '../data/site';
+import {
+  certifications,
+  education,
+  focusAreas,
+  location,
+  roles,
+  toolkit,
+} from '../data/resume';
 
 const stats = await ContentRepository.stats();
+const years = yearsOfExperience(roles);
+const companies = new Set(roles.map((role) => role.company)).size;
+const current = roles.find((role) => !role.end);
 
 const layers = [
   {
@@ -85,16 +98,22 @@ const principles = [
 
     <div class="intro">
       <div class="intro-copy">
-        <p>
-          I am a {site.role.toLowerCase()} working mostly on backend and distributed systems. This
-          site is the notebook I wish I had when I started: {stats.total} entries covering the concepts
-          I rely on, the system designs I have worked through, and what I am currently learning about
-          AI.
+        <p class="lede">
+          I am a {site.role.toLowerCase()} with {years}+ years of building backend and frontend
+          systems{current && <>, currently at {current.company}</>}. Most of my work sits where
+          architecture meets operations: designing the service, then making it deploy, scale and
+          stay observable once real traffic arrives.
         </p>
         <p>
-          It is not a portfolio and it is not a blog. There is no posting schedule. Pages appear
-          when I understand something well enough to explain it, and get revised when I realise
-          I did not.
+          Along the way I have led frontend and backend teams, moved slow work onto event-driven
+          pipelines, and built the delivery platforms other engineers ship on. These days I am
+          also working out where AI fits into that picture.
+        </p>
+        <p>
+          This site is the notebook I keep alongside that work: {stats.total} entries covering the
+          concepts I rely on, the system designs I have worked through, and what I am learning about
+          AI. Pages appear when I understand something well enough to explain it, and get revised
+          when I realise I did not.
         </p>
 
         <ul class="contact">
@@ -120,12 +139,81 @@ const principles = [
       </div>
 
       <dl class="figures">
-        <div><dt>Concepts</dt><dd>{stats.concepts}</dd></div>
-        <div><dt>System designs</dt><dd>{stats.systemDesigns}</dd></div>
-        <div><dt>AI notes</dt><dd>{stats.ai}</dd></div>
-        <div><dt>Tags in use</dt><dd>{stats.tags}</dd></div>
+        <div><dt>Experience</dt><dd>{years}+ yrs</dd></div>
+        <div><dt>Companies</dt><dd>{companies}</dd></div>
+        <div><dt>Based in</dt><dd class="text">{location}</dd></div>
+        <div><dt>Notes written</dt><dd>{stats.total}</dd></div>
       </dl>
     </div>
+
+    <section class="block">
+      <SectionHeader
+        title="What I work on"
+        description="The threads that keep showing up, whichever company or stack I am in."
+      />
+      <ul class="focus">
+        {
+          focusAreas.map((area) => (
+            <li>
+              <h3>{area.title}</h3>
+              <p>{area.body}</p>
+              <p class="proof">{area.proof}</p>
+            </li>
+          ))
+        }
+      </ul>
+    </section>
+
+    <section class="block">
+      <SectionHeader
+        title="Experience"
+        description="From first APIs to leading teams — most recent first."
+      />
+      <ExperienceTimeline roles={roles} />
+    </section>
+
+    <section class="block">
+      <SectionHeader
+        title="Toolkit"
+        description="What I reach for, grouped by where it lives."
+      />
+      <dl class="toolkit">
+        {
+          toolkit.map((group) => (
+            <div>
+              <dt>{group.label}</dt>
+              <dd>
+                <ul>
+                  {group.items.map((item) => (
+                    <li>{item}</li>
+                  ))}
+                </ul>
+              </dd>
+            </div>
+          ))
+        }
+      </dl>
+    </section>
+
+    <section class="block">
+      <SectionHeader title="Education" />
+      <div class="education">
+        <GraduationCap size={20} strokeWidth={1.75} aria-hidden="true" />
+        <div>
+          <h3>{education.degree}</h3>
+          <p>
+            {education.school} · {education.start} — {education.end}
+          </p>
+          {
+            certifications.length > 0 && (
+              <p class="cert">Certified: {certifications.join(', ')}</p>
+            )
+          }
+        </div>
+      </div>
+    </section>
+
+    <p class="part">About this site</p>
 
     <section class="block">
       <SectionHeader
@@ -299,12 +387,189 @@ const principles = [
     color: var(--text-secondary);
   }
 
+  .intro-copy .lede {
+    font-size: var(--text-lg);
+    color: var(--text-primary);
+  }
+
+  .figures dd.text {
+    font-size: var(--text-md);
+    font-weight: 500;
+  }
+
+  .focus {
+    display: grid;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+    gap: 0.75rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Three per row on a six-column grid, so an incomplete last row can stretch to fill the width
+     instead of leaving an orphan card — whatever the number of focus areas. */
+  .focus li {
+    grid-column: span 2;
+  }
+  .focus li:nth-last-child(2):nth-child(3n + 1),
+  .focus li:last-child:nth-child(3n + 2) {
+    grid-column: span 3;
+  }
+  .focus li:last-child:nth-child(3n + 1) {
+    grid-column: span 6;
+  }
+
+  .focus li {
+    display: flex;
+    flex-direction: column;
+    padding: 1rem 1.05rem;
+    border: 1px solid var(--border-subtle);
+    border-top: 2px solid var(--pillar);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .focus h3 {
+    margin: 0 0 0.4rem;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .focus p {
+    margin: 0;
+    font-size: 0.875rem;
+    line-height: 1.6;
+    color: var(--text-secondary);
+  }
+
+  /* Pushed to the bottom so the evidence lines align across cards of different lengths. */
+  .focus .proof {
+    margin-top: auto;
+    padding-top: 0.75rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    color: var(--pillar-dim);
+  }
+
+  .toolkit {
+    display: grid;
+    margin: 0;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+  }
+
+  .toolkit > div {
+    display: grid;
+    grid-template-columns: 8.5rem minmax(0, 1fr);
+    gap: 1rem;
+    align-items: baseline;
+    padding: 0.7rem 1rem;
+  }
+  .toolkit > div + div {
+    border-top: 1px solid var(--border-subtle);
+  }
+
+  .toolkit dt {
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+
+  .toolkit dd {
+    margin: 0;
+  }
+
+  .toolkit ul {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  .toolkit li {
+    padding: 0.15rem 0.5rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-md);
+    background: var(--surface-inset);
+    font-size: var(--text-sm);
+    color: var(--text-primary);
+  }
+
+  .education {
+    display: flex;
+    gap: 0.9rem;
+    align-items: flex-start;
+    padding: 1rem 1.1rem;
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    background: var(--surface);
+    color: var(--pillar);
+  }
+
+  .education h3 {
+    margin: 0;
+    font-size: 1rem;
+    color: var(--text-primary);
+  }
+
+  .education p {
+    margin: 0.2rem 0 0;
+    font-size: var(--text-md);
+    color: var(--text-secondary);
+  }
+
+  .education .cert {
+    margin-top: 0.5rem;
+    font-size: var(--text-sm);
+    color: var(--text-muted);
+  }
+
+  /* Divides the person from the publication: everything above is about me, below about the site. */
+  .part {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    margin: 1rem 0 -0.5rem;
+    font-family: var(--font-mono);
+    font-size: 0.6875rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+  }
+  .part::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--border-default);
+  }
+
   @media (max-width: 60rem) {
     .intro {
       grid-template-columns: 1fr;
     }
     .principles {
       grid-template-columns: 1fr;
+    }
+    .focus {
+      grid-template-columns: 1fr;
+    }
+    .focus li,
+    .focus li:nth-last-child(2):nth-child(3n + 1),
+    .focus li:last-child:nth-child(3n + 2),
+    .focus li:last-child:nth-child(3n + 1) {
+      grid-column: auto;
+    }
+  }
+
+  @media (max-width: 36rem) {
+    .toolkit > div {
+      grid-template-columns: 1fr;
+      gap: 0.45rem;
     }
   }
 </style>
