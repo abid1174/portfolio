@@ -1,0 +1,282 @@
+---
+title: 'Rate Limiting Algorithms: Which One to Pick and Why'
+description: 'Token bucket, leaky bucket, fixed window, sliding window log and sliding window counter — how each one decides, where each one breaks, and how to choose between them.'
+type: 'concept'
+category: 'Scalability'
+tags: ['Rate Limiting', 'Scalability', 'API Design', 'Redis', 'Algorithms', 'Performance']
+difficulty: 'intermediate'
+publishedAt: '2026-10-06'
+featured: false
+related: ['system-design/rate-limiter', 'concepts/circuit-breaker', 'concepts/cache-stampede']
+---
+
+Every rate limiter answers the same question — "should this request be allowed right now?" — but the five common algorithms answer it with very different ideas of what "right now" means. Some count requests in calendar-aligned buckets, some remember every timestamp, and some ignore counting altogether and model a stock of permission that refills over time. Those choices decide how bursty your traffic is allowed to be, how much memory each client costs, and how wrong the limiter is allowed to be at the edges.
+
+## What a Rate Limiter Is Actually Protecting
+
+Before picking an algorithm, be clear about what you're defending, because the answer changes which failure mode matters most.
+
+| Goal                          | Example                                 | What you care about                    |
+| ----------------------------- | --------------------------------------- | -------------------------------------- |
+| Protect a backend's capacity  | Database can take ~2,000 writes/sec     | Smooth, steady output rate             |
+| Fair use between tenants      | Free tier: 1,000 requests/hour          | Accurate per-client averages over time |
+| Abuse and brute-force defence | 5 login attempts per minute per account | No loophole to double the limit        |
+| Enforce a paid quota          | 1M API calls per billing month          | Exactness — overshoot is lost revenue  |
+
+All five algorithms below take a key (user id, API key, IP), a limit, and a window or rate, and return allow or reject. They differ in what state they keep per key and how they update it.
+
+<Mermaid caption="Where a rate limiter sits: it decides before the expensive work happens">{`flowchart LR
+    C[Client] --> G[API Gateway]
+    G --> RL{Rate limiter<br/>allow?}
+    RL -->|yes| S[Backend service]
+    RL -->|no| R[429 Too Many Requests<br/>+ Retry-After]
+    RL <-.->|read / update state| ST[(Counter store<br/>Redis / in-memory)]`}</Mermaid>
+
+## 1. Token Bucket
+
+Each key has a bucket holding up to `capacity` tokens. Tokens are added at a steady `refillRate` (say, 10 per second) until the bucket is full. Each request removes one token; if the bucket is empty, the request is rejected.
+
+<Mermaid caption="Token bucket: tokens refill steadily, requests spend them, a full bucket allows a burst">{`flowchart TB
+    Refill["Refill: +r tokens/sec<br/>(capped at capacity)"] --> B[("Bucket<br/>tokens: 0..capacity")]
+    Req[Incoming request] --> Check{tokens >= 1?}
+    B -.-> Check
+    Check -->|yes| Take["tokens -= 1<br/>ALLOW"]
+    Check -->|no| Reject[REJECT 429]`}</Mermaid>
+
+The important property is that the two parameters mean different things. `refillRate` is the long-run average you allow; `capacity` is how big a burst you tolerate after a quiet period. A client that's been idle for a minute can fire `capacity` requests instantly, and then settles back to `refillRate`.
+
+You don't need a timer to refill buckets. Store the token count and the last refill timestamp, and top it up lazily when a request arrives:
+
+```ts
+interface Bucket {
+  tokens: number;
+  lastRefill: number; // ms
+}
+
+function allow(bucket: Bucket, capacity: number, refillPerSec: number, now = Date.now()) {
+  const elapsedSec = (now - bucket.lastRefill) / 1000;
+  bucket.tokens = Math.min(capacity, bucket.tokens + elapsedSec * refillPerSec);
+  bucket.lastRefill = now;
+
+  if (bucket.tokens >= 1) {
+    bucket.tokens -= 1;
+    return true;
+  }
+  return false;
+}
+```
+
+- **Memory:** two numbers per key.
+- **Bursts:** allowed, up to `capacity`.
+- **Accuracy:** exact for the model it implements.
+- **Used by:** AWS API Gateway, Stripe, most cloud provider APIs.
+
+<Callout type="tip">
+  Token bucket generalises cleanly to weighted requests: an expensive endpoint can spend 10
+  tokens while a cheap one spends 1, so one bucket can express "1,000 units of work per minute"
+  instead of a blunt request count.
+</Callout>
+
+## 2. Leaky Bucket
+
+Leaky bucket flips the picture: requests enter a fixed-size queue, and the queue drains (is processed) at a constant rate. If the queue is full when a request arrives, it's dropped.
+
+<Mermaid caption="Leaky bucket: bursty input, perfectly smooth output">{`flowchart LR
+    In["Bursty incoming<br/>requests"] --> Q{Queue full?}
+    Q -->|no| Queue[["FIFO queue<br/>size = capacity"]]
+    Q -->|yes| Drop[REJECT 429]
+    Queue -->|"drain at fixed rate r/sec"| Out[Backend]`}</Mermaid>
+
+Where the token bucket lets a burst _through_, the leaky bucket _absorbs_ a burst and releases it evenly. The backend never sees more than `r` requests per second, no matter how spiky the input is. That makes it the right shape when the thing behind the limiter has a hard throughput ceiling — a legacy database, a third-party API with a strict QPS limit, an SMTP relay.
+
+The cost is latency: a request accepted at the back of a full queue waits `capacity / r` seconds before it's served. For interactive traffic that wait often feels worse than a fast 429.
+
+<Callout type="note">
+  There's also a "leaky bucket as a meter" variant that doesn't queue at all — it tracks a water
+  level that drains over time and rejects when full. Mathematically it's equivalent to a token
+  bucket viewed upside down, which is why the two names get used interchangeably. When someone
+  says leaky bucket, ask whether requests are queued or rejected.
+</Callout>
+
+## 3. Fixed Window Counter
+
+Divide time into fixed windows (e.g. each calendar minute), keep a counter per key per window, increment on each request, and reject once it passes the limit. The key is usually `ratelimit:{clientId}:{windowStart}` with a TTL so old windows expire on their own.
+
+```ts
+async function allow(redis: Redis, clientId: string, limit: number, windowSec: number) {
+  const window = Math.floor(Date.now() / 1000 / windowSec);
+  const key = `rl:${clientId}:${window}`;
+
+  const count = await redis.incr(key);
+  if (count === 1) await redis.expire(key, windowSec);
+
+  return count <= limit;
+}
+```
+
+It's the cheapest algorithm there is — one atomic `INCR` — and it's easy to explain to customers ("100 requests per minute, resets on the minute"). Its flaw is the boundary.
+
+<Mermaid caption="Fixed window boundary burst: 2x the limit in two seconds, and neither window is over its limit">{`flowchart LR
+    subgraph W1["Window 12:00:00 – 12:00:59 (limit 100)"]
+        A["12:00:00–12:00:58<br/>0 requests"] --> B["12:00:59<br/>100 requests ✅"]
+    end
+    subgraph W2["Window 12:01:00 – 12:01:59 (limit 100)"]
+        C["12:01:00<br/>100 requests ✅"] --> D["12:01:01–12:01:59<br/>0 requests"]
+    end
+    B -->|"200 requests in ~2 seconds"| C`}</Mermaid>
+
+Each window is individually within its limit, but the backend just took 200 requests in two seconds against a "100 per minute" policy. For fairness quotas that's usually fine; for brute-force protection or capacity protection it's a real hole.
+
+A second, quieter problem: when every client's window resets at the same instant, well-behaved clients that were throttled all retry at `:00` together, producing a synchronised spike — the same thundering-herd shape as a [cache stampede](/concepts/cache-stampede).
+
+## 4. Sliding Window Log
+
+Fix the boundary problem by not having boundaries. Store the timestamp of every accepted request for a key; on each new request, drop timestamps older than `now - window`, and allow only if the remaining count is under the limit.
+
+<Mermaid caption="Sliding window log: the window moves with every request">{`sequenceDiagram
+    participant C as Client
+    participant RL as Rate limiter
+    participant Z as Sorted set (timestamps)
+    C->>RL: request at t
+    RL->>Z: ZREMRANGEBYSCORE key 0 (t - window)
+    RL->>Z: ZCARD key
+    Z-->>RL: count
+    alt count < limit
+        RL->>Z: ZADD key t t
+        RL-->>C: 200 allowed
+    else count >= limit
+        RL-->>C: 429 rejected
+    end`}</Mermaid>
+
+In Redis this is a sorted set scored by timestamp, and the whole check should run in a single Lua script or `MULTI` block so concurrent requests can't both read "99" and both get in.
+
+- **Accuracy:** exact. There is no window edge to exploit.
+- **Memory:** one entry per request in the window. A limit of 10,000/hour means up to 10,000 entries per client — multiplied by every active client.
+- **CPU:** a sorted-set trim on every request, not a single increment.
+
+That makes it the right tool for **low limits where exactness matters** — login attempts, password resets, OTP sends, "3 free exports per day" — and the wrong tool for high-volume API traffic.
+
+## 5. Sliding Window Counter
+
+The pragmatic middle ground. Keep the fixed-window counters, but estimate a sliding window by weighting the previous window's count by how much of it still overlaps the sliding window:
+
+```
+estimate = prevCount × (1 − elapsedFractionOfCurrentWindow) + currentCount
+```
+
+<Mermaid caption="Sliding window counter: blend the previous window's count by its remaining overlap">{`flowchart LR
+    subgraph Prev["Previous minute: 80 requests"]
+        P1["first 25% — now outside the sliding window"] --- P2["last 75% — still inside"]
+    end
+    subgraph Curr["Current minute: 25% elapsed, 30 requests"]
+        C1["30 requests so far"]
+    end
+    P2 --> E["estimate = 80 × 0.75 + 30 = 90<br/>limit 100 → ALLOW"]
+    C1 --> E`}</Mermaid>
+
+The sliding window is always one full window long, so being 25% into the current minute means it covers that 25% plus the _last 75%_ of the previous minute. That overlap is the weight: `1 − 0.25 = 0.75`.
+
+The estimate assumes requests in the previous window were spread evenly, which they rarely are, so it can be slightly wrong in either direction. In practice the error is small — Cloudflare measured it at a fraction of a percent of requests wrongly allowed or rejected across their traffic — and you get it for the cost of two integers per key.
+
+```ts
+function allow(prev: number, curr: number, limit: number, elapsedFraction: number) {
+  const estimate = prev * (1 - elapsedFraction) + curr;
+  return estimate < limit;
+}
+```
+
+## Side-by-Side
+
+| Algorithm              | State per key        | Allows bursts?          | Boundary exploit? | Accuracy    | Typical use                                |
+| ---------------------- | -------------------- | ----------------------- | ----------------- | ----------- | ------------------------------------------ |
+| Token bucket           | 2 numbers            | Yes, up to capacity     | No                | Exact       | Public APIs, per-user limits with bursts   |
+| Leaky bucket (queue)   | Queue up to capacity | Absorbed, output smooth | No                | Exact       | Protecting a fixed-throughput downstream   |
+| Fixed window           | 1 counter            | Yes, 2x at edges        | Yes               | Edge-leaky  | Coarse quotas, internal limits, simplicity |
+| Sliding window log     | 1 entry per request  | No                      | No                | Exact       | Low-volume, security-sensitive limits      |
+| Sliding window counter | 2 counters           | Mild                    | Largely fixed     | Approximate | High-volume API limits at scale            |
+
+<Tradeoff
+  optionA="Token bucket"
+  optionB="Sliding window counter"
+  a={[
+    'Separates average rate from burst size — two knobs, two meanings',
+    'Natural fit for weighted costs per endpoint',
+    'Needs read-modify-write (Lua script) for atomic updates in Redis',
+  ]}
+  b={[
+    'Matches how quotas are usually written: "N per minute"',
+    'Two INCRs on plain counters, trivially atomic and cheap',
+    'Approximate — assumes even distribution in the previous window',
+  ]}
+  recommendation="Default to token bucket when clients are humans or SDKs that legitimately burst; default to sliding window counter when the contract is a plain 'N per window' quota at very high volume."
+/>
+
+## When to Pick Which
+
+<Mermaid caption="Choosing a rate limiting algorithm">{`flowchart TD
+    Start([What are you limiting?]) --> Q1{Must output be<br/>perfectly smooth for a<br/>fixed-capacity downstream?}
+    Q1 -->|yes| LB[Leaky bucket<br/>queue + constant drain]
+    Q1 -->|no| Q2{Low limit and<br/>exactness is a<br/>security requirement?}
+    Q2 -->|yes| SWL[Sliding window log]
+    Q2 -->|no| Q3{Should clients be<br/>able to burst after<br/>being idle?}
+    Q3 -->|yes| TB[Token bucket]
+    Q3 -->|no| Q4{Is a 2x burst at the<br/>window edge acceptable?}
+    Q4 -->|yes| FW[Fixed window<br/>simplest possible]
+    Q4 -->|no| SWC[Sliding window counter]`}</Mermaid>
+
+Some concrete pairings:
+
+- **Public REST API, per API key** → token bucket. Real clients batch work, page through results, and retry; a burst allowance stops you punishing normal behaviour while the refill rate still caps the average.
+- **Login, password reset, OTP / SMS sends** → sliding window log. Limits are tiny (5 per 15 minutes), so storage is negligible, and an attacker must not be able to double their guesses at a window edge. SMS sends also cost real money per message.
+- **Calling a third-party API with a hard QPS cap** → leaky bucket (as an outbound queue). You want to never exceed their limit, and you'd rather wait than eat their 429s.
+- **Edge / CDN limiting across millions of IPs** → sliding window counter. Constant tiny memory per key, cheap atomic increments, and accuracy that's good enough when the goal is shedding abusive traffic.
+- **Internal service-to-service limits, cron jobs, admin tools** → fixed window. Nobody is gaming the boundary, and the simplicity is worth more than precision.
+- **Billing-grade quotas (1M calls/month)** → none of these on their own. A month-long window makes boundary effects negligible, so a counter works, but it must be durable and authoritative — a ledger, not a cache with a TTL.
+
+<Decision
+  title="Combine algorithms when you have two different goals"
+  choice="A token bucket for short-term bursts plus a sliding window counter for the long-term quota"
+>
+  A single limit can't express "no more than 20 requests per second, and no more than 10,000 per
+  day". Those are different policies — one protects capacity right now, the other enforces fair
+  use over time — so run two limiters and reject if either says no. Most production APIs layer
+  limits this way: per-second, per-minute and per-day, each with the algorithm that suits its
+  timescale.
+</Decision>
+
+## Running It Across Many Servers
+
+Every algorithm above is easy on one machine. With twenty gateway instances, the state has to be shared, and that's where most real bugs live.
+
+<Callout type="warning" title="Read-then-write is a race">
+  `GET count` → check → `SET count + 1` lets two concurrent requests both read 99 and both pass
+  a limit of 100. Use atomic primitives (`INCR`, which returns the new value) or run the whole
+  check inside a Redis Lua script so the read, decision and write happen as one step.
+</Callout>
+
+- **Centralised store (Redis):** exact across instances, at the cost of a network hop per request and a dependency on Redis being up. Shard keys across a cluster with [consistent hashing](/concepts/consistent-hashing) so one hot client doesn't pin one node.
+- **Local counters with periodic sync:** each instance enforces roughly `limit / instances` locally and reconciles with the shared store every second or two. Much faster, but allows bounded overshoot — fine for abuse protection, wrong for billing.
+- **Fail open or fail closed?** If the limiter's store is unreachable, most APIs fail open (allow traffic, alert loudly) because an outage of the limiter shouldn't become an outage of the product. Security-sensitive limits like login attempts should fail closed.
+
+## Tell Clients What Happened
+
+A rate limiter that silently drops requests turns into a retry storm. Return `429 Too Many Requests` with headers that let well-behaved clients back off precisely:
+
+```http
+HTTP/1.1 429 Too Many Requests
+Retry-After: 12
+RateLimit-Limit: 100
+RateLimit-Remaining: 0
+RateLimit-Reset: 12
+```
+
+<Callout type="insight">
+  Rate limiting and [circuit breakers](/concepts/circuit-breaker) are mirror images. A rate
+  limiter protects *you* from your callers; a circuit breaker protects your dependencies from
+  *you*. A resilient service usually needs both, and a client that honours `Retry-After` with
+  jittered backoff is what keeps the two from fighting each other.
+</Callout>
+
+## Takeaway
+
+Fixed window is the simplest and leaks 2x at its edges. Sliding window log is exact and expensive, so save it for small, security-critical limits. Sliding window counter is the cheap, nearly-exact default for high-volume quotas. Token bucket is the most flexible for public APIs because it separates average rate from burst size. Leaky bucket is the one to reach for when the thing you're protecting needs a perfectly steady input rate. Start from what you're protecting and how much burst you can afford, and the algorithm usually picks itself. For how these fit into a full distributed design, see [Designing a Rate Limiter](/system-design/rate-limiter).
